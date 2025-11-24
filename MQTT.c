@@ -25,7 +25,8 @@ void MQTT_CONNECT(u32 keepalive)												//keepalive是保持时间
 	mqtt.Load_len = 2 + strlen(mqtt.ClientID) +									//前面的2指接下来的数据长度，目前不包含遗嘱
 					2 + strlen(mqtt.UserName) +
 					2 + strlen(mqtt.Passward);		
-	mqtt.Reamining_len = mqtt.Variableheader_len + mqtt.Load_len;			
+	mqtt.Reamining_len = mqtt.Variableheader_len + mqtt.Load_len;	
+			
 	mqtt.buff[0] = 0x10; 
 	do{
 		if(mqtt.Reamining_len/128 == 0)												//不需要进位 
@@ -93,7 +94,8 @@ void MQTT_CONNECTWILL( u8 Will_Retain, u8 Will_QoS, u8 Clean_Session, u32 keepal
 					2 + strlen(mqtt.WillTopic) +
 					2 + strlen(mqtt.WillData) +
 					2 + strlen(mqtt.Passward);		
-	mqtt.Reamining_len = mqtt.Variableheader_len + mqtt.Load_len;			
+	mqtt.Reamining_len = mqtt.Variableheader_len + mqtt.Load_len;	
+			
 	mqtt.buff[0] = 0x10; 
 	do{
 		if(mqtt.Reamining_len/128 == 0)												//不需要进位 
@@ -171,9 +173,62 @@ char MQTT_CONNACK(u8* rxdata, u32 rxdata_len)
 	return rxdata[3];
 } 
 
+/************************DISCONNECT函数*************************/ 
 void MQTT_DISCONNECT(void)
 {
 	mqtt.buff[0] = 0xE0;
 	mqtt.buff[1] = 0x00;
 	mqtt.length = 2;
 }
+
+/************************SUBSCRIBE函数*************************/ 
+void MQTT_SUBSCRIBE(char* topic, char QS)
+{
+	/************************固定报头*************************/ 
+	int statue = 0;
+	mqtt.Fixedheader_len = 1;
+	mqtt.Variableheader_len = 2;
+	mqtt.Load_len = 2 + strlen(topic) +	1;											//2:主题长度，1服务等级 
+	mqtt.Reamining_len = mqtt.Variableheader_len + mqtt.Load_len;
+				
+	mqtt.buff[0] = 0x82; 
+	do{
+		if(mqtt.Reamining_len/128 == 0)												//不需要进位 
+		{
+			mqtt.buff[mqtt.Fixedheader_len] = mqtt.Reamining_len; 
+		}else
+		{
+			mqtt.buff[mqtt.Fixedheader_len] = (mqtt.Reamining_len % 128) | 0x80; 
+		} 
+		mqtt.Fixedheader_len++;
+		statue++;
+		mqtt.Reamining_len = mqtt.Reamining_len/128; 
+	}while(mqtt.Reamining_len);
+	
+	/************************可变报头*************************/ 
+	
+	mqtt.buff[mqtt.Fixedheader_len++] = mqtt.MessageID/256;								//报文标识符高位 
+	mqtt.buff[mqtt.Fixedheader_len++] = mqtt.MessageID%256;								//报文标识符低位 
+	mqtt.MessageID++;
+	if(mqtt.MessageID == 0)
+	{
+		mqtt.MessageID = 1;
+	} 
+	
+	/************************有效负载*************************/ 
+	mqtt.buff[mqtt.Fixedheader_len++] = strlen(topic)/256;
+	mqtt.buff[mqtt.Fixedheader_len++] = strlen(topic)%256;	
+	memcpy(&mqtt.buff[mqtt.Fixedheader_len], topic, strlen(topic));
+	mqtt.buff[mqtt.Fixedheader_len + strlen(topic)] = QS;
+	
+	mqtt.Fixedheader_len = 1 + statue;												//固定报头最终长度（包括剩余长度）
+	
+	mqtt.length =  mqtt.Fixedheader_len + mqtt.Variableheader_len + mqtt.Load_len;	//报文总长度 
+}
+
+
+
+
+
+
+

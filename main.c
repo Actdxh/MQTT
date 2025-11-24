@@ -18,7 +18,7 @@ int Str_to_Hex(s8* indata, u8* outdata)
 	str = indata;
 	while(*str != '\0')
 	{
-		outdata[num] = strtol(str, &endstr, 16);
+		outdata[num] = strtol(str, (char**)&endstr, 16);
 		num++;
 		str = endstr;
 	}
@@ -34,6 +34,8 @@ int main(int argc, char *argv[]) {
 	MQTT_CONNECTWILL( 1, 2, 1, 100);
 
 	MQTT_DISCONNECT(); 
+	
+	MQTT_SUBSCRIBE("USER002", 2);
 	
 	for(i = 0; i < mqtt.length; i++)
 	{
