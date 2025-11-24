@@ -48,6 +48,8 @@ char MQTT_PINGRESP(u8* rxdata, u32 rxdata_len);
 void MQTT_PUBLISH0(char retain, char* topic, u8 *data, u32 data_len);
 void MQTT_PUBLISH(char dup, char QoS, char retain, char* topic, u8 *data, u32 data_len);
 char MQTT_ProcessPUBLISH(u8* rxdata, u32 rxdata_len, u8 *qs, u32* messageid); 
+void MQTT_PUBACK(u32 messageid);
+char MQTT_ProcessPublish(u8* rxdata, u32 rxdata_len, u32* messageid);
 
 
 #endif

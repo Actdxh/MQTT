@@ -401,7 +401,7 @@ void MQTT_PUBLISH(char dup, char QoS, char retain, char* topic, u8 *data, u32 da
 }
 
 
-/************************处理服务器推送的主题相关函数*************************/ 
+/************************处理服务器推送的PUBLISH相关函数*************************/ 
 char MQTT_ProcessPUBLISH(u8* rxdata, u32 rxdata_len, u8 *qs, u32* messageid)
 {
 	char i;
@@ -464,9 +464,29 @@ char MQTT_ProcessPUBLISH(u8* rxdata, u32 rxdata_len, u8 *qs, u32* messageid)
 	return i;
 } 
 
+/************************PUBAC函数*************************/ 
+void MQTT_PUBACK(u32 messageid)
+{
+	mqtt.buff[0] = 0x40;
+	mqtt.buff[1] = 0x02;
+	mqtt.buff[2] = messageid/256;
+	mqtt.buff[3] = messageid%256;
+	
+	mqtt.length = 4;
+}
 
-
-
+/************************处理服务器推送的PUBLISHACK相关函数*************************/ 
+char MQTT_ProcessPublish(u8* rxdata, u32 rxdata_len, u32* messageid)
+{
+	if((rxdata_len == 4) && (rxdata[0] == 0x40))
+	{
+		*messageid = rxdata[2]*256 + rxdata[3];
+	}else
+	{
+		return -1;
+	}
+	return 1;
+} 
 
 
 
