@@ -9,7 +9,7 @@ int i;
 int res;
 u8 databuff[64];
 u8 outbuff[64];
-
+1
 int Str_to_Hex(s8* indata, u8* outdata)
 {
 	int num = 0;
