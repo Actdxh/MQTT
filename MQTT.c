@@ -4,7 +4,7 @@
 
 MQTT_TCB mqtt;
 
-
+1
 void MQTT_Init(void)
 {
 	memset(&mqtt, 0, sizeof(mqtt));
