@@ -11,12 +11,14 @@ int i;
 int res;
 u8 databuff[64];
 u8 outbuff[64];
+u8 QoS;
+u32 messageid;
 
 
 int main(int argc, char *argv[]) {
 	MQTT_Init();	
 	
-	publish1_test();
+	processpublish_test();
 
 
 
@@ -169,13 +171,40 @@ void publish0_test(void)
 	printf("\r\n");
 }
 
-void publish1_test(void)
+void publish_test(void)
 {
-	MQTT_PUBLISH1(1, 0, "USER001","123", 3);
+	MQTT_PUBLISH(1, 2, 1, "USER001","123", 3);
 	for(i = 0; i < mqtt.length; i++)
 	{
 		printf("%02x ",mqtt.buff[i]);
 	}
 	printf("\r\n");
 }
+
+void processpublish_test(void)
+{
+	gets(databuff);
+	res = Str_to_Hex(databuff, outbuff);
+	for(i = 0; i < res; i++)
+	{
+		printf("%02x ",outbuff[i]);
+	}
+	printf("outbuff[2] = 0x%02x, outbuff[3] = 0x%02x\r\n", outbuff[2], outbuff[3]);
+	printf("\r\n");
+	printf("%d",res);
+	printf("%d\r\n",MQTT_processPUBLISH(outbuff, res, &QoS, &messageid));
+	printf("QoS = %d\r\n",QoS);
+	printf("messageid = %x\r\n",messageid);
+	printf("topic_len = %d\r\n",mqtt.topic[0]*256 + mqtt.topic[1]);
+	printf("topic = %s\r\n",mqtt.topic[2]);
+	
+	printf("data_len = %d\r\n",mqtt.data[0]*256 + mqtt.data[1]);	
+	printf("data = %s\r\n",mqtt.data[2]);
+}
+
+
+
+
+
+
 

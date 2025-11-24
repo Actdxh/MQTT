@@ -353,8 +353,8 @@ void MQTT_PUBLISH0(char retain, char* topic, u8 *data, u32 data_len)
 	mqtt.length =  mqtt.Fixedheader_len + mqtt.Variableheader_len + mqtt.Load_len;		//报文总长度 
 }
 
-/************************PUBLISH1函数*************************/ 
-void MQTT_PUBLISH1(char dup, char retain, char* topic, u8 *data, u32 data_len)
+/************************PUBLISH函数*************************/ 
+void MQTT_PUBLISH(char dup, char QoS, char retain, char* topic, u8 *data, u32 data_len)
 {
 	/************************固定报头*************************/ 
 	int statue = 0;
@@ -363,7 +363,7 @@ void MQTT_PUBLISH1(char dup, char retain, char* topic, u8 *data, u32 data_len)
 	mqtt.Load_len = data_len;		
 	mqtt.Reamining_len = mqtt.Variableheader_len + mqtt.Load_len;	
 			
-	mqtt.buff[0] = 0x32 | (dup << 3) | (retain << 0); 
+	mqtt.buff[0] = 0x30 | (dup << 3) | (QoS << 1)| (retain << 0); 
 	do{
 		if(mqtt.Reamining_len/128 == 0)													//不需要进位 
 		{
@@ -401,7 +401,69 @@ void MQTT_PUBLISH1(char dup, char retain, char* topic, u8 *data, u32 data_len)
 }
 
 
-
+/************************处理服务器推送的主题相关函数*************************/ 
+char MQTT_processPUBLISH(u8* rxdata, u32 rxdata_len, u8 *qs, u32* messageid)
+{
+	char i;
+	u32 topic_len;
+	u32 data_len;
+	
+	if((rxdata[0] & 0xF0) == 0x30)
+	{
+		for(i = 1; i <5; i++)															//确定剩余长度，与上第八位，剩余长度最多四个字节所以是5 
+		{
+			if((rxdata[i] & 0x80) == 0)
+			{
+				break;
+			} 
+		}
+		switch(rxdata[0] & 0x60)
+		{
+			case 0x00:
+						*qs = 0;
+						*messageid = 0;													//qs等级是0就没有报文标识符 
+						topic_len = rxdata[1 + i] * 256 + rxdata[1 + i + 1];
+						data_len = rxdata_len - 1 - i - 2 - topic_len;
+						memset(mqtt.topic, 0, TOPIC_SIZE);
+						memset(mqtt.data, 0, DATA_SIZE);
+						memcpy(mqtt.topic, &rxdata[1 + i], topic_len + 2);				//这里是直接把接收的主题按照mqtt的格式复制，然后加2的原因是要把最前面的长度算上也就是长度+主题
+						mqtt.data[0] = data_len/256;
+						mqtt.data[1] = data_len%256;
+						memcpy(&mqtt.data[2], &rxdata[1 + i + 2 + topic_len], data_len);
+						break;
+			case 0x02:
+						*qs = 1;
+						topic_len = rxdata[1 + i] * 256 + rxdata[1 + i + 1];
+						*messageid = rxdata[1 + i + 2 + topic_len] * 256 + rxdata[1 + i + 2 + topic_len + 1];
+						data_len = rxdata_len - 1 - i - 2 - topic_len - 2;
+						memset(mqtt.topic, 0, TOPIC_SIZE);
+						memset(mqtt.data, 0, DATA_SIZE);
+						memcpy(mqtt.topic, &rxdata[1 + i], topic_len + 2);				//这里是直接把接收的主题按照mqtt的格式复制，然后加2的原因是要把最前面的长度算上也就是长度+主题
+						mqtt.data[0] = data_len/256;
+						mqtt.data[0] = data_len%256;
+						memcpy(&mqtt.data[2], &rxdata[1 + i + 2 + topic_len + 2], data_len);
+						break;
+			case 0x04:
+						*qs = 2;
+						topic_len = rxdata[1 + i] * 256 + rxdata[1 + i + 1];
+						*messageid = rxdata[1 + i + 2 + topic_len] * 256 + rxdata[1 + i + 2 + topic_len + 1];
+						data_len = rxdata_len - 1 - i - 2 - topic_len - 2;
+						memset(mqtt.topic, 0, TOPIC_SIZE);
+						memset(mqtt.data, 0, DATA_SIZE);
+						memcpy(mqtt.topic, &rxdata[1 + i], topic_len + 2);				//这里是直接把接收的主题按照mqtt的格式复制，然后加2的原因是要把最前面的长度算上也就是长度+主题
+						mqtt.data[0] = data_len/256;
+						mqtt.data[0] = data_len%256;
+						memcpy(&mqtt.data[2], &rxdata[1 + i + 2 + topic_len + 2], data_len);
+						break;
+						
+		}
+	}else
+	{
+		return -1;
+	}
+	printf("DEBUG: Inside MQTT_processPUBLISH - mqtt.topic[0]=0x%02x, mqtt.topic[1]=0x%02x\r\n", mqtt.topic[0], mqtt.topic[1]);
+	return i;
+} 
 
 
 
