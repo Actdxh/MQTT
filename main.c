@@ -27,7 +27,7 @@ int Str_to_Hex(s8* indata, u8* outdata)
 	return num;
 } 
 
-
+1
 int main(int argc, char *argv[]) {
 	MQTT_Init();
 	printf("%s\r\n",mqtt.ClientID);
@@ -38,10 +38,10 @@ int main(int argc, char *argv[]) {
 	res = Str_to_Hex(databuff, outbuff);
 	
 	printf("%d\r\n",MQTT_CONNACK(outbuff, res));
-	for(i = 0; i < res; i++)
-	{
-		printf("%02x ",outbuff[i]);
-	}
-	printf("\r\n");
+//	for(i = 0; i < res; i++)
+//	{
+//		printf("%02x ",outbuff[i]);
+//	}
+//	printf("\r\n");
 	return 0;
 }
