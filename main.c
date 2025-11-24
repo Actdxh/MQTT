@@ -32,10 +32,19 @@ int main(int argc, char *argv[]) {
 	printf("%s\r\n",mqtt.UserName);
 	printf("%s\r\n",mqtt.Passward);
 	MQTT_CONNECTWILL( 1, 2, 1, 100);
-	gets(databuff);
-	res = Str_to_Hex(databuff, outbuff);
+
+	MQTT_DISCONNECT(); 
 	
-	printf("%d\r\n",MQTT_CONNACK(outbuff, res));
+	for(i = 0; i < mqtt.length; i++)
+	{
+		printf("%02x ",mqtt.buff[i]);
+	}
+	printf("\r\n");
+	
+//	gets(databuff);
+//	res = Str_to_Hex(databuff, outbuff);
+//	
+//	printf("%d\r\n",MQTT_CONNACK(outbuff, res));
 //	for(i = 0; i < res; i++)
 //	{
 //		printf("%02x ",outbuff[i]);
