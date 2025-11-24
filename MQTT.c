@@ -182,7 +182,7 @@ void MQTT_DISCONNECT(void)
 }
 
 /************************SUBSCRIBE函数*************************/ 
-void MQTT_SUBSCRIBE(char* topic, char QS)
+void MQTT_SUBSCRIBE(char* topic, char QS)											//一次制订阅一个主题 
 {
 	/************************固定报头*************************/ 
 	int statue = 0;
@@ -226,7 +226,17 @@ void MQTT_SUBSCRIBE(char* topic, char QS)
 	mqtt.length =  mqtt.Fixedheader_len + mqtt.Variableheader_len + mqtt.Load_len;	//报文总长度 
 }
 
-
+/************************SUBACK函数*************************/ 
+char MQTT_SUBACK(u8* rxdata, u32 rxdata_len)
+{
+	if((rxdata_len == 5) && (rxdata[0] == 0x90))
+	{
+	}else
+	{
+		return -1;
+	}
+	return rxdata[4];
+} 
 
 
 
