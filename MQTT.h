@@ -25,7 +25,7 @@ typedef struct{
 
 extern MQTT_TCB mqtt;
 
-1
+
 
 
 void MQTT_Init(void);
