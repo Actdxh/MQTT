@@ -294,3 +294,46 @@ char MQTT_UNSUBACK(u8* rxdata, u32 rxdata_len)
 	return 1;
 } 
 
+/************************PINGREQº¯Êý*************************/ 
+void MQTT_PINGREQ(void)
+{
+	mqtt.buff[0] = 0xC0;
+	mqtt.buff[1] = 0x00;
+	mqtt.length = 2;
+}
+
+/************************PINGRESPº¯Êý*************************/ 
+char MQTT_PINGRESP(u8* rxdata, u32 rxdata_len)
+{
+	if((rxdata_len == 2) && (rxdata[0] == 0xD0))
+	{
+	}else
+	{
+		return -1;
+	}
+	return 1;
+} 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

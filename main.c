@@ -16,7 +16,7 @@ u8 outbuff[64];
 int main(int argc, char *argv[]) {
 	MQTT_Init();	
 	
-	unsuback_test();
+	pingresp_test();
 
 
 
@@ -133,11 +133,31 @@ void unsuback_test(void)
 	}
 	printf("\r\n");
 	
-	printf("%d\r\n",MQTT_UNSUBACK(outbuff, res));			//返回的是正确（0）于否（-1） 
+	printf("%d\r\n",MQTT_UNSUBACK(outbuff, res));			//返回的是正确（1）与否（-1） 
 } 
 
+void ping(void)
+{
+	MQTT_PINGREQ(); 
+	for(i = 0; i < mqtt.length; i++)
+	{
+		printf("%02x ",mqtt.buff[i]);
+	}
+	printf("\r\n");
+}
 
-
+void pingresp_test(void)
+{
+	gets(databuff);
+	res = Str_to_Hex(databuff, outbuff);
+	for(i = 0; i < res; i++)
+	{
+		printf("%02x ",outbuff[i]);
+	}
+	printf("\r\n");
+	
+	printf("%d\r\n",MQTT_PINGRESP(outbuff, res));			//返回的是正确（1）与否（-1） 
+} 
 
 
 

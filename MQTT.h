@@ -34,5 +34,6 @@ void MQTT_CONNECTWILL( u8 Will_Retain, u8 Will_QoS, u8 Clean_Session, u32 keepal
 char MQTT_CONNACK(u8* rxdata, u32 rxdata_len);
 void MQTT_DISCONNECT(void);
 void MQTT_SUBSCRIBE(char* topic, char QS);
+void MQTT_PINGREQ(void);
 
 #endif
