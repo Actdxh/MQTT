@@ -314,7 +314,44 @@ char MQTT_PINGRESP(u8* rxdata, u32 rxdata_len)
 	return 1;
 } 
 
-
+/************************PUBLISH函数*************************/ 
+void MQTT_PUBLISH0(char retain, char* topic, u8 *data, u32 data_len)
+{
+	/************************固定报头*************************/ 
+	int statue = 0;
+	mqtt.Fixedheader_len = 1;
+	mqtt.Variableheader_len = 2 + strlen(topic);
+	mqtt.Load_len = data_len;		
+	mqtt.Reamining_len = mqtt.Variableheader_len + mqtt.Load_len;	
+			
+	mqtt.buff[0] = 0x30 | (retain << 0); 
+	do{
+		if(mqtt.Reamining_len/128 == 0)													//不需要进位 
+		{
+			mqtt.buff[mqtt.Fixedheader_len] = mqtt.Reamining_len; 
+		}else
+		{
+			mqtt.buff[mqtt.Fixedheader_len] = (mqtt.Reamining_len % 128) | 0x80; 
+		} 
+		mqtt.Fixedheader_len++;
+		statue++;
+		mqtt.Reamining_len = mqtt.Reamining_len/128; 
+	}while(mqtt.Reamining_len);
+	
+	/************************可变报头*************************/ 
+	mqtt.buff[mqtt.Fixedheader_len++] = strlen(topic)/256;
+	mqtt.buff[mqtt.Fixedheader_len++] = strlen(topic)%256;	
+	memcpy(&mqtt.buff[mqtt.Fixedheader_len], topic, strlen(topic));
+	
+	/************************有效负载*************************/ 
+	
+	memcpy(&mqtt.buff[mqtt.Fixedheader_len + strlen(topic)], data, data_len);
+	
+	
+	mqtt.Fixedheader_len = 1 + statue;													//固定报头最终长度（包括剩余长度）
+	
+	mqtt.length =  mqtt.Fixedheader_len + mqtt.Variableheader_len + mqtt.Load_len;		//报文总长度 
+}
 
 
 
