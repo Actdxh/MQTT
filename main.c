@@ -18,7 +18,7 @@ u32 messageid;
 int main(int argc, char *argv[]) {
 	MQTT_Init();	
 	
-	processpublishack();
+	processpubrec();
 
 
 
@@ -234,5 +234,35 @@ void processpublishack(void)
 }
 
 
+void pubrec_test(void)
+{
+	gets(databuff);
+	res = Str_to_Hex(databuff, outbuff);
+	for(i = 0; i < res; i++)
+	{
+		printf("%02x ",outbuff[i]);
+	}
+	printf("\r\n");
+	printf("%d\r\n",MQTT_ProcessPUBLISH(outbuff, res, &QoS, &messageid));
+	if(QoS = 2)
+	{
+		MQTT_PUBREC(messageid);
+		for(i = 0; i < mqtt.length; i++)
+		{
+			printf("%02x ",mqtt.buff[i]);
+		}
+	}
+}
 
-
+void processpubrec(void)
+{
+	gets(databuff);
+	res = Str_to_Hex(databuff, outbuff);
+	for(i = 0; i < res; i++)
+	{
+		printf("%02x ",outbuff[i]);
+	}
+	printf("\r\n");
+	printf("%d\r\n",MQTT_ProcessPUBREC(outbuff, res, &messageid));
+	printf("%x\r\n", messageid);
+}
