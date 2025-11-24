@@ -27,6 +27,10 @@ int Str_to_Hex(s8* indata, u8* outdata)
 	return num;
 } 
 
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 int main(int argc, char *argv[]) {
 	MQTT_Init();
 	printf("%s\r\n",mqtt.ClientID);
