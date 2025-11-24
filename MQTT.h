@@ -47,7 +47,7 @@ void MQTT_PINGREQ(void);
 char MQTT_PINGRESP(u8* rxdata, u32 rxdata_len);
 void MQTT_PUBLISH0(char retain, char* topic, u8 *data, u32 data_len);
 void MQTT_PUBLISH(char dup, char QoS, char retain, char* topic, u8 *data, u32 data_len);
-char MQTT_processPUBLISH(u8* rxdata, u32 rxdata_len, u8 *qs, u32* messageid); 
+char MQTT_ProcessPUBLISH(u8* rxdata, u32 rxdata_len, u8 *qs, u32* messageid); 
 
 
 #endif
