@@ -39,6 +39,7 @@ char MQTT_UNSUBACK(u8* rxdata, u32 rxdata_len);
 void MQTT_PINGREQ(void);
 char MQTT_PINGRESP(u8* rxdata, u32 rxdata_len);
 void MQTT_PUBLISH0(char retain, char* topic, u8 *data, u32 data_len);
+void MQTT_PUBLISH1(char dup, char retain, char* topic, u8 *data, u32 data_len);
 
 
 

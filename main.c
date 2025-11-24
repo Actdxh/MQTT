@@ -16,7 +16,7 @@ u8 outbuff[64];
 int main(int argc, char *argv[]) {
 	MQTT_Init();	
 	
-	publish_test();
+	publish1_test();
 
 
 
@@ -159,7 +159,7 @@ void pingresp_test(void)
 	printf("%d\r\n",MQTT_PINGRESP(outbuff, res));			//返回的是正确（1）与否（-1） 
 } 
 
-void publish_test(void)
+void publish0_test(void)
 {
 	MQTT_PUBLISH0(1, "USER001","123", 3);
 	for(i = 0; i < mqtt.length; i++)
@@ -169,5 +169,13 @@ void publish_test(void)
 	printf("\r\n");
 }
 
-
+void publish1_test(void)
+{
+	MQTT_PUBLISH1(1, 0, "USER001","123", 3);
+	for(i = 0; i < mqtt.length; i++)
+	{
+		printf("%02x ",mqtt.buff[i]);
+	}
+	printf("\r\n");
+}
 
