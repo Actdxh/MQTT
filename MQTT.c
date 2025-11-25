@@ -512,6 +512,16 @@ char MQTT_ProcessPUBREC(u8* rxdata, u32 rxdata_len, u32* messageid)
 	return 1;
 } 
 
+/************************PUBRELº¯Êý*************************/ 
+void MQTT_PUBREL(u32 messageid)
+{
+	mqtt.buff[0] = 0x62;
+	mqtt.buff[1] = 0x02;
+	mqtt.buff[2] = messageid/256;
+	mqtt.buff[3] = messageid%256;
+	
+	mqtt.length = 4;
+}
 
 
 
