@@ -54,6 +54,8 @@ void MQTT_PUBREC(u32 messageid);
 char MQTT_ProcessPUBREC(u8* rxdata, u32 rxdata_len, u32* messageid);
 void MQTT_PUBREL(u32 messageid); 
 char MQTT_ProcessPUBREL(u8* rxdata, u32 rxdata_len, u32* messageid);
+void MQTT_PUBCOMP(u32 messageid);
+char MQTT_ProcessPUBCOMP(u8* rxdata, u32 rxdata_len, u32* messageid);
 
 
 

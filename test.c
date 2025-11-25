@@ -254,8 +254,27 @@ void processpubrel(void)
 	printf("%x\r\n", messageid);
 }
 
+void pubcomp_test(void)
+{
+	processpubrel();
+	MQTT_PUBCOMP(messageid);
+	for(i = 0; i < mqtt.length; i++)
+	{
+		printf("%02x ",mqtt.buff[i]);
+	}
+}
 
-
-
+void processpubcomp(void)
+{
+	gets(databuff);
+	res = Str_to_Hex(databuff, outbuff);
+	for(i = 0; i < res; i++)
+	{
+		printf("%02x ",outbuff[i]);
+	}
+	printf("\r\n");
+	printf("%d\r\n",MQTT_ProcessPUBCOMP(outbuff, res, &messageid));
+	printf("%x\r\n", messageid);
+}
 
 

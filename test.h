@@ -21,7 +21,8 @@ void processpublishack(void);
 void pubrec_test(void);
 void processpubrec(void);
 void pubrel_test(void);
-
+void pubcomp_test(void);
+void processpubcomp(void);
 
 
 
