@@ -523,7 +523,18 @@ void MQTT_PUBREL(u32 messageid)
 	mqtt.length = 4;
 }
 
-
+/************************处理服务器收到qs2之后返回的PUBREC相关函数*************************/ 
+char MQTT_ProcessPUBREL(u8* rxdata, u32 rxdata_len, u32* messageid)
+{
+	if((rxdata_len == 4) && (rxdata[0] == 0x62))
+	{
+		*messageid = rxdata[2]*256 + rxdata[3];
+	}else
+	{
+		return -1;
+	}
+	return 1;
+} 
 
 
 

@@ -230,3 +230,32 @@ void processpubrec(void)
 	printf("%d\r\n",MQTT_ProcessPUBREC(outbuff, res, &messageid));
 	printf("%x\r\n", messageid);
 }
+
+void pubrel_test(void)
+{
+	processpubrec();
+	MQTT_PUBREL(messageid);
+	for(i = 0; i < mqtt.length; i++)
+	{
+		printf("%02x ",mqtt.buff[i]);
+	}
+}
+
+void processpubrel(void)
+{
+	gets(databuff);
+	res = Str_to_Hex(databuff, outbuff);
+	for(i = 0; i < res; i++)
+	{
+		printf("%02x ",outbuff[i]);
+	}
+	printf("\r\n");
+	printf("%d\r\n",MQTT_ProcessPUBREL(outbuff, res, &messageid));
+	printf("%x\r\n", messageid);
+}
+
+
+
+
+
+

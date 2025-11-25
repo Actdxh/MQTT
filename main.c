@@ -18,7 +18,7 @@ u32 messageid;
 int main(int argc, char *argv[]) {
 	MQTT_Init();	
 	
-	processpubrec();
+	processpubrel();
 
 
 
