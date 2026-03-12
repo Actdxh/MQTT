@@ -4,11 +4,11 @@
 CPP      = g++.exe
 CC       = gcc.exe
 WINDRES  = windres.exe
-OBJ      = main.o MQTT.o test.o
-LINKOBJ  = main.o MQTT.o test.o
-LIBS     = -L"E:/APPWORK/Dev-Cpp/MinGW64/lib" -L"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/lib" -static-libgcc
-INCS     = -I"E:/APPWORK/Dev-Cpp/MinGW64/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include"
-CXXINCS  = -I"E:/APPWORK/Dev-Cpp/MinGW64/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include/c++"
+OBJ      = examples/src/main.o examples/src/test.o src/MQTT.o
+LINKOBJ  = examples/src/main.o examples/src/test.o src/MQTT.o
+LIBS     = -L"E:/APPWORK/Dev-Cpp/MinGW64/lib" -L"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/lib" -static-libgcc -L"H:/GITHUB/MQTT/inc" -L"H:/GITHUB/MQTT/src" -L"H:/GITHUB/MQTT/examples/inc" -L"H:/GITHUB/MQTT/examples/src"
+INCS     = -I"E:/APPWORK/Dev-Cpp/MinGW64/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"H:/GITHUB/MQTT/inc" -I"H:/GITHUB/MQTT/examples/inc" -I"H:/GITHUB/MQTT/examples/src" -I"H:/GITHUB/MQTT/src"
+CXXINCS  = -I"E:/APPWORK/Dev-Cpp/MinGW64/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include/c++" -I"H:/GITHUB/MQTT/inc" -I"H:/GITHUB/MQTT/examples/inc" -I"H:/GITHUB/MQTT/examples/src" -I"H:/GITHUB/MQTT/src"
 BIN      = MQTT.exe
 CXXFLAGS = $(CXXINCS) 
 CFLAGS   = $(INCS) 
@@ -24,11 +24,11 @@ clean: clean-custom
 $(BIN): $(OBJ)
 	$(CC) $(LINKOBJ) -o $(BIN) $(LIBS)
 
-main.o: main.c
-	$(CC) -c main.c -o main.o $(CFLAGS)
+examples/src/main.o: examples/src/main.c
+	$(CC) -c examples/src/main.c -o examples/src/main.o $(CFLAGS)
 
-MQTT.o: MQTT.c
-	$(CC) -c MQTT.c -o MQTT.o $(CFLAGS)
+examples/src/test.o: examples/src/test.c
+	$(CC) -c examples/src/test.c -o examples/src/test.o $(CFLAGS)
 
-test.o: test.c
-	$(CC) -c test.c -o test.o $(CFLAGS)
+src/MQTT.o: src/MQTT.c
+	$(CC) -c src/MQTT.c -o src/MQTT.o $(CFLAGS)
