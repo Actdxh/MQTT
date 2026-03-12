@@ -1,0 +1,33 @@
+# Compiled Object files
+*.o
+*.obj
+*.ko
+*.so
+*.dll
+*.a
+*.lib
+
+# Executable files
+*.exe
+*.out
+*.app
+
+# Dev-C++ specific user layout/settings (Keep .dev project file, but ignore user layout)
+*.layout
+
+# Auto-generated Makefiles (Optional: Uncomment if you don't want to track Dev-C++ compiled makefile)
+# Makefile.win
+
+# Logs and databases
+*.log
+*.sqlite
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE configuration
+.vscode/
+.idea/
+*.swp
+*.bak
