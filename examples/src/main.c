@@ -49,15 +49,22 @@ int main(int argc, char *argv[]) {
 	MQTT_Init(&MqttA, &configA);
 	MQTT_Init(&MqttB, &configB);
 
+	printf("MQTT Client A:\r\n");
 	connect_test(&MqttA);
 	printf("\r\n");
 
 	// connect_test(&MqttB);
 	// printf("\r\n");
-	
+
+	printf("MQTT Subscriptions:\r\n");
 	subscribe_test(&MqttA);
 	printf("\r\n");
 
+	printf("MQTT Publications:\r\n");
+	publish_test(&MqttA);
+	printf("\r\n");
+
+	printf("MQTT Unsubscriptions:\r\n");
 	unsubscribe_test(&MqttA);
 	printf("\r\n");
 	

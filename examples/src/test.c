@@ -23,7 +23,7 @@ void connect_test(MQTT_TCB *m)
 		printf("Failed to pack MQTT CONNECT message\r\n");
 		return;
 	}else {
-		for(i = 0; i < m->length.totallength; i++)
+		for(i = 0; i < m->length.Totallength; i++)
 		{
 			printf("%02x ",m->buff[i]);
 		}
@@ -48,7 +48,7 @@ void connectack_test(MQTT_TCB *m)
 void disconnect_test(MQTT_TCB *m)
 {
 	MQTT_DISCONNECT(m); 
-	for(i = 0; i < m->length.totallength; i++)
+	for(i = 0; i < m->length.Totallength; i++)
 	{
 		printf("%02x ",m->buff[i]);
 	}
@@ -57,12 +57,12 @@ void disconnect_test(MQTT_TCB *m)
 
 void subscribe_test(MQTT_TCB *m)
 {
-	res = MQTT_SUBSCRIBE(m, "TEST", 0);
+	res = MQTT_SUBSCRIBE(m, "TEST", 1);
 	if(res < 0) {
 		printf("Failed to pack MQTT SUBSCRIBE message\r\n");
 		return;
 	}
-	for(i = 0; i < m->length.totallength; i++)
+	for(i = 0; i < m->length.Totallength; i++)
 	{
 		printf("%02x ",m->buff[i]);
 	}
@@ -87,7 +87,7 @@ void unsubscribe_test(MQTT_TCB *m)
 		printf("Failed to pack MQTT UNSUBSCRIBE message\r\n");
 		return;
 	}
-	for(i = 0; i < m->length.totallength; i++)
+	for(i = 0; i < m->length.Totallength; i++)
 	{
 		printf("%02x ",m->buff[i]);
 	}
@@ -109,7 +109,7 @@ void unsuback_test(MQTT_TCB *m)
 void ping(MQTT_TCB *m)
 {
 	MQTT_PINGREQ(m); 
-	for(i = 0; i < m->length.totallength; i++)
+	for(i = 0; i < m->length.Totallength; i++)
 	{
 		printf("%02x ",m->buff[i]);
 	}
@@ -132,7 +132,7 @@ void pingresp_test(MQTT_TCB *m)
 void publish0_test(MQTT_TCB *m)
 {
 	MQTT_PUBLISH0(m, 1, "USER001","123", 3);
-	for(i = 0; i < m->length.totallength; i++)
+	for(i = 0; i < m->length.Totallength; i++)
 	{
 		printf("%02x ",m->buff[i]);
 	}
@@ -141,12 +141,32 @@ void publish0_test(MQTT_TCB *m)
 
 void publish_test(MQTT_TCB *m)
 {
-	MQTT_PUBLISH(m, 1, 2, 1, "USER001","123", 3);
-	for(i = 0; i < m->length.totallength; i++)
+	mqtt_publish_params_t params = {
+	.topic = "TEST",
+	.payload = "testnum:0x23",
+	.payload_len = 12,
+	.qos = 1,
+	.retain = 0,
+	.dup = 0
+	};
+	
+	res = mqtt_pack_publish_two(m, m->buff, BUFF_SIZE, &params);
+
+// 	res = MQTT_PUBLISH(m, 0, 1, 0, "TEST","testnum:0x23", 12);
+	if(res < 0) {
+		printf("Failed to pack MQTT PUBLISH message\r\n");
+		return;
+	}
+	for(i = 0; i < m->length.Totallength; i++)
 	{
 		printf("%02x ",m->buff[i]);
 	}
 	printf("\r\n");
+
+
+
+	
+
 }
 
 void processpublish_test(MQTT_TCB *m)
@@ -178,10 +198,10 @@ void publishack_test(MQTT_TCB *m)
 	}
 	printf("\r\n");
 	printf("%d\r\n",MQTT_ProcessPUBLISH(m, outbuff, res, &QoS, &messageid));
-	if(QoS = 1)
+	if(QoS == 1)
 	{
 		MQTT_PUBACK(m,messageid);
-		for(i = 0; i < m->length.totallength; i++)
+		for(i = 0; i < m->length.Totallength; i++)
 		{
 			printf("%02x ",m->buff[i]);
 		}
@@ -215,7 +235,7 @@ void pubrec_test(MQTT_TCB *m)
 	if(QoS == 2)
 	{
 		MQTT_PUBREC(m, messageid);
-		for(i = 0; i < m->length.totallength; i++)
+		for(i = 0; i < m->length.Totallength; i++)
 		{
 			printf("%02x ",m->buff[i]);
 		}
@@ -239,7 +259,7 @@ void pubrel_test(MQTT_TCB *m)
 {
 	processpubrec(m);
 	MQTT_PUBREL(m, messageid);
-	for(i = 0; i < m->length.totallength; i++)
+	for(i = 0; i < m->length.Totallength; i++)
 	{
 		printf("%02x ",m->buff[i]);
 	}
@@ -262,7 +282,7 @@ void pubcomp_test(MQTT_TCB *m)
 {
 	processpubrel(m);
 	MQTT_PUBCOMP(m, messageid);
-	for(i = 0; i < m->length.totallength; i++)
+	for(i = 0; i < m->length.Totallength; i++)
 	{
 		printf("%02x ",m->buff[i]);
 	}

@@ -57,6 +57,9 @@ int mqtt_pack_connect(MQTT_TCB*m, uint8_t* out, uint16_t out_size, uint16_t keep
 
 	out[p++] = 0x10; 																			//CONNECT报文类型，标志位为0
 	rem_len_bytes = mqtt_write_rem_len(out + p, Remaining_len);
+	if((rem_len_bytes == 0) || (rem_len_bytes > 4)) {
+		return -1; // Invalid remaining length
+	}
 	p = p + rem_len_bytes;
 
 	Fixedheader_len = 1 + rem_len_bytes;													//固定报头最终长度（包括剩余长度）
@@ -197,6 +200,9 @@ int mqtt_pack_subscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const char
 				
 	out[p++] = 0x82; 
 	rem_len_bytes = mqtt_write_rem_len(out + p, Remaining_len);
+	if((rem_len_bytes == 0) || (rem_len_bytes > 4)) {
+		return -1; // Invalid remaining length
+	}
 	p = p + rem_len_bytes;
 
 	Fixedheader_len = 1 + rem_len_bytes;													//固定报头最终长度（包括剩余长度）
@@ -271,6 +277,9 @@ int mqtt_pack_unsubscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, char * t
 				
 	out[p++] = 0xA2; 
 	rem_len_bytes = mqtt_write_rem_len(out + p, Remaining_len);
+	if((rem_len_bytes == 0) || (rem_len_bytes > 4)) {
+		return -1; // Invalid remaining length
+	}
 	p = p + rem_len_bytes;
 
 	Fixedheader_len = 1 + rem_len_bytes;													//固定报头最终长度（包括剩余长度）
@@ -404,11 +413,14 @@ int mqtt_pack_publish(
 	if(topic == NULL || payload == NULL) {
 		return -1; // Invalid input
 	}
-	if((qos > 2)||(qos < 0)) {
+	if(qos >= 2) {
 		return -1; // Invalid QoS
 	}
 	if(dup > 1) {
 		return -1; // Invalid DUP flag
+	}
+	if(retain > 1) {
+		return -1; // Invalid retain flag
 	}
 	
 	uint16_t p = 0;
@@ -422,17 +434,20 @@ int mqtt_pack_publish(
 	int rem_len_bytes = 0;;
 
 	Fixedheader_len = 1;
-	Variableheader_len = 2 + topic_len + 2;
+	Variableheader_len = 2 + topic_len + ((qos > 0) ? 2 : 0);		//主题长度+主题内容+（如果服务等级大于0则加上报文标识符长度）
 	Load_len = payload_len;
 	Remaining_len = Variableheader_len + Load_len;
 	out[p++] = 0x30 | (dup << 3) | (qos << 1)| (retain << 0);
 	rem_len_bytes = mqtt_write_rem_len(out + p, Remaining_len);
+	if((rem_len_bytes == 0) || (rem_len_bytes > 4)) {
+		return -1; // Invalid remaining length
+	}
 	p = p + rem_len_bytes;
 	
 	Fixedheader_len = 1 + rem_len_bytes;													//固定报头最终长度（包括剩余长度）
 	Totallength =  Fixedheader_len + Variableheader_len + Load_len;		//报文总长度 
 	if(out_size < Totallength) {
-		return -1; // Output buffer is too small
+		return -1; //这里的长度检测还有一个不足就是没有考虑要发送超级大数组导致超过uint16_t然后回卷导致判断是够的，当然也被实际的数组长度限制，这里暂时不做修改
 	}
 	/************************可变报头*************************/ 
 
@@ -440,12 +455,14 @@ int mqtt_pack_publish(
 	if(res < 0) {
 		return -1; // Error writing topic
 	}
-	out[p++] = m->MessageID/256;								//报文标识符高位 
-	out[p++] = m->MessageID%256;								//报文标识符低位 
-	m->MessageID++;
-	if(m->MessageID == 0)
-	{
-		m->MessageID = 1;
+	if(qos > 0) {
+		out[p++] = m->MessageID/256;								//报文标识符高位 
+		out[p++] = m->MessageID%256;								//报文标识符低位 
+		m->MessageID++;
+		if(m->MessageID == 0)
+		{
+			m->MessageID = 1;
+		}
 	} 
 	/************************有效负载*************************/ 
 	memcpy(out+p, payload, payload_len);
@@ -464,9 +481,19 @@ int mqtt_pack_publish(
 	return Totallength;
 }
 
-void MQTT_PUBLISH(MQTT_TCB *m, char dup, char QoS, char retain, char* topic, u8 *data, u32 data_len)
+//提供一个更方便的接口，直接传入参数结构体
+int mqtt_pack_publish_two(MQTT_TCB* m,uint8_t* out,uint16_t out_size, mqtt_publish_params_t *params)
 {
-	mqtt_pack_publish(m, m->buff, BUFF_SIZE, topic, data, data_len, QoS, retain, dup);
+	if(params == NULL) {
+		return -1; // Invalid input
+	}
+	return mqtt_pack_publish(m, out, out_size, params->topic, params->payload, params->payload_len, params->qos, params->retain, params->dup);
+}
+
+
+int MQTT_PUBLISH(MQTT_TCB *m, char dup, char QoS, char retain, char* topic, void *data, u32 data_len)
+{
+	return mqtt_pack_publish(m, m->buff, BUFF_SIZE, topic, data, data_len, QoS, retain, dup);
 }
 
 

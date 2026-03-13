@@ -22,6 +22,7 @@ typedef struct{
 	uint32_t Totallength;						//报文总长度 
 }MQTT_length_t;
 
+
 typedef struct{
 	
 	char ClientID[PARA_SIZE];				//参数缓冲区 
@@ -44,6 +45,16 @@ typedef struct{
 	u8 data[DATA_SIZE];						//接收到服务推送的数据 
 }MQTT_TCB;
 
+typedef struct {
+    const char* topic;
+    const void* payload;
+    uint16_t payload_len;
+
+    uint8_t qos;     // 0/1
+    uint8_t retain;  // 0/1
+    uint8_t dup;     // 0/1
+}mqtt_publish_params_t;
+
 
 int MQTT_Init(MQTT_TCB *m, const MQTT_config_t *config);
 int MQTT_CONNECT(MQTT_TCB *m, u32 keepalive);
@@ -56,7 +67,7 @@ char MQTT_UNSUBACK(MQTT_TCB *m, u8* rxdata, u32 rxdata_len);
 void MQTT_PINGREQ(MQTT_TCB *m);
 char MQTT_PINGRESP(MQTT_TCB *m, u8* rxdata, u32 rxdata_len);
 void MQTT_PUBLISH0(MQTT_TCB *m, char retain, char* topic, u8 *data, u32 data_len);
-void MQTT_PUBLISH(MQTT_TCB *m, char dup, char QoS, char retain, char* topic, u8 *data, u32 data_len);
+int MQTT_PUBLISH(MQTT_TCB *m, char dup, char QoS, char retain, char* topic, void *data, u32 data_len);
 char MQTT_ProcessPUBLISH(MQTT_TCB *m, u8* rxdata, u32 rxdata_len, u8 *qs, u32* messageid); 
 void MQTT_PUBACK(MQTT_TCB *m, u32 messageid);
 char MQTT_ProcessPublish(MQTT_TCB *m, u8* rxdata, u32 rxdata_len, u32* messageid);
@@ -82,5 +93,6 @@ int mqtt_pack_publish(
     uint8_t retain,    // 0/1
     uint8_t dup        // 0/1（qos=0 时 dup 也允许但一般没意义）
 );
+int mqtt_pack_publish_two(MQTT_TCB* m,uint8_t* out,uint16_t out_size, mqtt_publish_params_t *params);
 #endif
 
