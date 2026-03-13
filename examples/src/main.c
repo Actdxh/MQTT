@@ -4,7 +4,9 @@
 #include "MQTT.h"
 #include "cc.h"
 #include <string.h>
-
+#include "test.h"
+#include "mqtt_utils.h"
+#include <stdint.h>
 /* run this program using the console pauser or add your own getch, system("pause") or input loop */
 
 int i;
@@ -14,35 +16,58 @@ u8 outbuff[64];
 u8 QoS;
 u32 messageid;
 
+MQTT_config_t configA = {
+	.ClientID = "USER001",
+	.UserName = "USER001",
+	.Passward = "USER001",
+	.WillEnable = 1,
+	.WillTopic = "WILL001",
+	.WillData = "WILL001",
+	.WillRetain = 0,
+	.WillQoS = 0,
+	.CleanSession = 1
+};
+
+MQTT_config_t configB = {
+	.ClientID = "USER002",
+	.UserName = "USER002",
+	.Passward = "USER002",
+	.WillEnable = 0,
+	.WillTopic = "WILL002",
+	.WillData = "WILL002",
+	.WillRetain = 0,
+	.WillQoS = 0,
+	.CleanSession = 1
+};
+
+
+MQTT_TCB MqttA;
+MQTT_TCB MqttB;
 
 int main(int argc, char *argv[]) {
-	MQTT_Init();	
+
+	MQTT_Init(&MqttA, &configA);
+	MQTT_Init(&MqttB, &configB);
+
+	connect_test(&MqttA);
+	printf("\r\n");
+
+	// connect_test(&MqttB);
+	// printf("\r\n");
 	
-	processpubcomp();
+	subscribe_test(&MqttA);
+	printf("\r\n");
 
-
-
+	unsubscribe_test(&MqttA);
+	printf("\r\n");
+	
+	
 	printf("\r\n");
 	return 0;
 }
 
 
 
-int Str_to_Hex(s8* indata, u8* outdata)
-{
-	int num = 0;
-	s8 *str;
-	s8 *endstr;
-	
-	str = indata;
-	while(*str != '\0')
-	{
-		outdata[num] = strtol(str, (char**)&endstr, 16);
-		num++;
-		str = endstr;
-	}
-	
-	return num;
-}
+
 
 

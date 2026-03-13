@@ -4,10 +4,10 @@ Name=MQTT
 Type=1
 Ver=2
 ObjFiles=
-Includes=
+Includes=H:\GITHUB\MQTT\inc;H:\GITHUB\MQTT\examples\inc;H:\GITHUB\MQTT\examples\src;H:\GITHUB\MQTT\src
 Libs=H:\GITHUB\MQTT\inc;H:\GITHUB\MQTT\src;H:\GITHUB\MQTT\examples\inc;H:\GITHUB\MQTT\examples\src
 PrivateResource=
-ResourceIncludes=
+ResourceIncludes=H:\GITHUB\MQTT\examples\inc;H:\GITHUB\MQTT\examples\src;H:\GITHUB\MQTT\inc;H:\GITHUB\MQTT\src
 MakeIncludes=
 Compiler=
 CppCompiler=
@@ -29,7 +29,7 @@ IncludeVersionInfo=0
 SupportXPThemes=0
 CompilerSet=0
 CompilerSettings=0000000000000000000000000
-UnitCount=7
+UnitCount=9
 
 [VersionInfo]
 Major=1
@@ -112,6 +112,26 @@ BuildCmd=
 
 [Unit7]
 FileName=inc\cc.h
+CompileCpp=0
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit8]
+FileName=src\mqtt_utils.c
+CompileCpp=0
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit9]
+FileName=inc\mqtt_utils.h
 CompileCpp=0
 Folder=
 Compile=1

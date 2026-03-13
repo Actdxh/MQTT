@@ -4,8 +4,8 @@
 CPP      = g++.exe
 CC       = gcc.exe
 WINDRES  = windres.exe
-OBJ      = examples/src/main.o examples/src/test.o src/MQTT.o
-LINKOBJ  = examples/src/main.o examples/src/test.o src/MQTT.o
+OBJ      = examples/src/main.o examples/src/test.o src/MQTT.o src/mqtt_utils.o
+LINKOBJ  = examples/src/main.o examples/src/test.o src/MQTT.o src/mqtt_utils.o
 LIBS     = -L"E:/APPWORK/Dev-Cpp/MinGW64/lib" -L"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/lib" -static-libgcc -L"H:/GITHUB/MQTT/inc" -L"H:/GITHUB/MQTT/src" -L"H:/GITHUB/MQTT/examples/inc" -L"H:/GITHUB/MQTT/examples/src"
 INCS     = -I"E:/APPWORK/Dev-Cpp/MinGW64/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"H:/GITHUB/MQTT/inc" -I"H:/GITHUB/MQTT/examples/inc" -I"H:/GITHUB/MQTT/examples/src" -I"H:/GITHUB/MQTT/src"
 CXXINCS  = -I"E:/APPWORK/Dev-Cpp/MinGW64/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include/c++" -I"H:/GITHUB/MQTT/inc" -I"H:/GITHUB/MQTT/examples/inc" -I"H:/GITHUB/MQTT/examples/src" -I"H:/GITHUB/MQTT/src"
@@ -32,3 +32,6 @@ examples/src/test.o: examples/src/test.c
 
 src/MQTT.o: src/MQTT.c
 	$(CC) -c src/MQTT.c -o src/MQTT.o $(CFLAGS)
+
+src/mqtt_utils.o: src/mqtt_utils.c
+	$(CC) -c src/mqtt_utils.c -o src/mqtt_utils.o $(CFLAGS)

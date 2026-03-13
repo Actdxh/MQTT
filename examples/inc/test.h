@@ -1,28 +1,28 @@
 #ifndef __TEST_H
 #define __TEST_H
 #include "main.h"
+#include "MQTT.h"
 
-
-void data_test(void);
-void connect_test(void);
-void connectack_test(void);
-void disconnect_test(void);
-void subscribe_test(void);
-void suback_test();
-void unsubscribe_test(void);
-void unsuback_test(void);
-void ping(void);
-void pingresp_test(void);
-void publish0_test(void);
-void publish_test(void);
-void processpublish_test(void);
-void publishack_test(void);
-void processpublishack(void);
-void pubrec_test(void);
-void processpubrec(void);
-void pubrel_test(void);
-void pubcomp_test(void);
-void processpubcomp(void);
+void data_test(MQTT_TCB *m);
+void connect_test(MQTT_TCB *m);
+void connectack_test(MQTT_TCB *m);
+void disconnect_test(MQTT_TCB *m);
+void subscribe_test(MQTT_TCB *m);
+void suback_test(MQTT_TCB *m);
+void unsubscribe_test(MQTT_TCB *m);
+void unsuback_test(MQTT_TCB *m);
+void ping(MQTT_TCB *m);
+void pingresp_test(MQTT_TCB *m);
+void publish0_test(MQTT_TCB *m);
+void publish_test(MQTT_TCB *m);
+void processpublish_test(MQTT_TCB *m);
+void publishack_test(MQTT_TCB *m);
+void processpublishack(MQTT_TCB *m);
+void pubrec_test(MQTT_TCB *m);
+void processpubrec(MQTT_TCB *m);
+void pubrel_test(MQTT_TCB *m);
+void pubcomp_test(MQTT_TCB *m);
+void processpubcomp(MQTT_TCB *m);
 
 
 

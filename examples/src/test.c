@@ -9,34 +9,31 @@
 
 
 
-void data_test(void)
+void data_test(MQTT_TCB *m)
 {
-	printf("%s\r\n",mqtt.ClientID);
-	printf("%s\r\n",mqtt.UserName);
-	printf("%s\r\n",mqtt.Passward);
+	printf("%s\r\n",m->param.ClientID);
+	printf("%s\r\n",m->param.UserName);
+	printf("%s\r\n",m->param.Passward);
 }
 
-void connect_test(void)
+void connect_test(MQTT_TCB *m)
 {
-	MQTT_CONNECT(100);
-	for(i = 0; i < mqtt.length; i++)
-	{
-		printf("%02x ",mqtt.buff[i]);
+	int ret = MQTT_CONNECT(m, 100);
+	if(ret < 0) {
+		printf("Failed to pack MQTT CONNECT message\r\n");
+		return;
+	}else {
+		for(i = 0; i < m->length.totallength; i++)
+		{
+			printf("%02x ",m->buff[i]);
+		}
 	}
+	
 	printf("\r\n");
 }
 
-void  connectwill_test(void)
-{
-	MQTT_CONNECTWILL( 1, 2, 1, 100);
-	for(i = 0; i < mqtt.length; i++)
-	{
-		printf("%02x ",mqtt.buff[i]);
-	}
-	printf("\r\n");
-}
 
-void connectack_test(void)
+void connectack_test(MQTT_TCB *m)
 {
 	gets(databuff);
 	res = Str_to_Hex(databuff, outbuff);
@@ -45,30 +42,33 @@ void connectack_test(void)
 		printf("%02x ",outbuff[i]);
 	}
 	printf("\r\n");
-	printf("%d\r\n",MQTT_CONNACK(outbuff, res));			//返回的是服务等级 
+	printf("%d\r\n",MQTT_CONNACK(m, outbuff, res));			//氐欠燃 
 }
 
-void disconnect_test(void)
+void disconnect_test(MQTT_TCB *m)
 {
-	MQTT_DISCONNECT(); 
-	for(i = 0; i < mqtt.length; i++)
+	MQTT_DISCONNECT(m); 
+	for(i = 0; i < m->length.totallength; i++)
 	{
-		printf("%02x ",mqtt.buff[i]);
+		printf("%02x ",m->buff[i]);
 	}
 	printf("\r\n");
 }
 
-void subscribe_test(void)
+void subscribe_test(MQTT_TCB *m)
 {
-	MQTT_SUBSCRIBE("USER002", 2);
-	
-	for(i = 0; i < mqtt.length; i++)
+	res = MQTT_SUBSCRIBE(m, "TEST", 0);
+	if(res < 0) {
+		printf("Failed to pack MQTT SUBSCRIBE message\r\n");
+		return;
+	}
+	for(i = 0; i < m->length.totallength; i++)
 	{
-		printf("%02x ",mqtt.buff[i]);
+		printf("%02x ",m->buff[i]);
 	}
 }
 
-void suback_test()
+void suback_test(MQTT_TCB *m)
 {
 	gets(databuff);
 	res = Str_to_Hex(databuff, outbuff); 
@@ -77,19 +77,23 @@ void suback_test()
 		printf("%02x ",outbuff[i]);
 	}
 	printf("\r\n");
-	printf("%d\r\n",MQTT_SUBACK(outbuff, res));			//返回的是服务等级
+	printf("%d\r\n",MQTT_SUBACK(m, outbuff, res));			//氐欠燃
 } 
 
-void unsubscribe_test(void)
+void unsubscribe_test(MQTT_TCB *m)
 {
-	MQTT_UNSUBSCRIBE("USER002");
-	for(i = 0; i < mqtt.length; i++)
+	res = MQTT_UNSUBSCRIBE(m, "TEST");
+	if(res < 0) {
+		printf("Failed to pack MQTT UNSUBSCRIBE message\r\n");
+		return;
+	}
+	for(i = 0; i < m->length.totallength; i++)
 	{
-		printf("%02x ",mqtt.buff[i]);
+		printf("%02x ",m->buff[i]);
 	}
 }
 
-void unsuback_test(void)
+void unsuback_test(MQTT_TCB *m)
 {
 	gets(databuff);
 	res = Str_to_Hex(databuff, outbuff);
@@ -99,20 +103,20 @@ void unsuback_test(void)
 	}
 	printf("\r\n");
 	
-	printf("%d\r\n",MQTT_UNSUBACK(outbuff, res));			//返回的是正确（1）与否（-1） 
+	printf("%d\r\n",MQTT_UNSUBACK(m, outbuff, res));			//氐确1-1 
 } 
 
-void ping(void)
+void ping(MQTT_TCB *m)
 {
-	MQTT_PINGREQ(); 
-	for(i = 0; i < mqtt.length; i++)
+	MQTT_PINGREQ(m); 
+	for(i = 0; i < m->length.totallength; i++)
 	{
-		printf("%02x ",mqtt.buff[i]);
+		printf("%02x ",m->buff[i]);
 	}
 	printf("\r\n");
 }
 
-void pingresp_test(void)
+void pingresp_test(MQTT_TCB *m)
 {
 	gets(databuff);
 	res = Str_to_Hex(databuff, outbuff);
@@ -122,30 +126,30 @@ void pingresp_test(void)
 	}
 	printf("\r\n");
 	
-	printf("%d\r\n",MQTT_PINGRESP(outbuff, res));			//返回的是正确（1）与否（-1） 
+	printf("%d\r\n",MQTT_PINGRESP(m, outbuff, res));			//氐确1-1 
 } 
 
-void publish0_test(void)
+void publish0_test(MQTT_TCB *m)
 {
-	MQTT_PUBLISH0(1, "USER001","123", 3);
-	for(i = 0; i < mqtt.length; i++)
+	MQTT_PUBLISH0(m, 1, "USER001","123", 3);
+	for(i = 0; i < m->length.totallength; i++)
 	{
-		printf("%02x ",mqtt.buff[i]);
+		printf("%02x ",m->buff[i]);
 	}
 	printf("\r\n");
 }
 
-void publish_test(void)
+void publish_test(MQTT_TCB *m)
 {
-	MQTT_PUBLISH(1, 2, 1, "USER001","123", 3);
-	for(i = 0; i < mqtt.length; i++)
+	MQTT_PUBLISH(m, 1, 2, 1, "USER001","123", 3);
+	for(i = 0; i < m->length.totallength; i++)
 	{
-		printf("%02x ",mqtt.buff[i]);
+		printf("%02x ",m->buff[i]);
 	}
 	printf("\r\n");
 }
 
-void processpublish_test(void)
+void processpublish_test(MQTT_TCB *m)
 {
 	gets(databuff);
 	res = Str_to_Hex(databuff, outbuff);
@@ -154,17 +158,17 @@ void processpublish_test(void)
 		printf("%02x ",outbuff[i]);
 	}
 	printf("\r\n");
-	printf("%d\r\n",MQTT_ProcessPUBLISH(outbuff, res, &QoS, &messageid));
+	printf("%d\r\n",MQTT_ProcessPUBLISH(m, outbuff, res, &QoS, &messageid));
 	printf("QoS = %d\r\n",QoS);
 	printf("messageid = %x\r\n",messageid);
-	printf("topic_len = %d\r\n",mqtt.topic[0]*256 + mqtt.topic[1]);
-	printf("topic = %s\r\n",&mqtt.topic[2]);
+	printf("topic_len = %d\r\n",m->topic[0]*256 + m->topic[1]);
+	printf("topic = %s\r\n",&m->topic[2]);
 	
-	printf("data_len = %d\r\n",mqtt.data[0]*256 + mqtt.data[1]);	
-	printf("data = %s\r\n",&mqtt.data[2]);
+	printf("data_len = %d\r\n",m->data[0]*256 + m->data[1]);	
+	printf("data = %s\r\n",&m->data[2]);
 }
 
-void publishack_test(void)
+void publishack_test(MQTT_TCB *m)
 {
 	gets(databuff);
 	res = Str_to_Hex(databuff, outbuff);
@@ -173,18 +177,18 @@ void publishack_test(void)
 		printf("%02x ",outbuff[i]);
 	}
 	printf("\r\n");
-	printf("%d\r\n",MQTT_ProcessPUBLISH(outbuff, res, &QoS, &messageid));
+	printf("%d\r\n",MQTT_ProcessPUBLISH(m, outbuff, res, &QoS, &messageid));
 	if(QoS = 1)
 	{
-		MQTT_PUBACK(messageid);
-		for(i = 0; i < mqtt.length; i++)
+		MQTT_PUBACK(m,messageid);
+		for(i = 0; i < m->length.totallength; i++)
 		{
-			printf("%02x ",mqtt.buff[i]);
+			printf("%02x ",m->buff[i]);
 		}
 	}
 }
 
-void processpublishack(void)
+void processpublishack(MQTT_TCB *m)
 {
 	gets(databuff);
 	res = Str_to_Hex(databuff, outbuff);
@@ -193,12 +197,12 @@ void processpublishack(void)
 		printf("%02x ",outbuff[i]);
 	}
 	printf("\r\n");
-	printf("%d\r\n",MQTT_ProcessPublish(outbuff, res, &messageid));
+	printf("%d\r\n",MQTT_ProcessPublish(m, outbuff, res, &messageid));
 	printf("%x\r\n", messageid);
 }
 
 
-void pubrec_test(void)
+void pubrec_test(MQTT_TCB *m)
 {
 	gets(databuff);
 	res = Str_to_Hex(databuff, outbuff);
@@ -207,18 +211,18 @@ void pubrec_test(void)
 		printf("%02x ",outbuff[i]);
 	}
 	printf("\r\n");
-	printf("%d\r\n",MQTT_ProcessPUBLISH(outbuff, res, &QoS, &messageid));
-	if(QoS = 2)
+	printf("%d\r\n",MQTT_ProcessPUBLISH(m, outbuff, res, &QoS, &messageid));
+	if(QoS == 2)
 	{
-		MQTT_PUBREC(messageid);
-		for(i = 0; i < mqtt.length; i++)
+		MQTT_PUBREC(m, messageid);
+		for(i = 0; i < m->length.totallength; i++)
 		{
-			printf("%02x ",mqtt.buff[i]);
+			printf("%02x ",m->buff[i]);
 		}
 	}
 }
 
-void processpubrec(void)
+void processpubrec(MQTT_TCB *m)
 {
 	gets(databuff);
 	res = Str_to_Hex(databuff, outbuff);
@@ -227,21 +231,21 @@ void processpubrec(void)
 		printf("%02x ",outbuff[i]);
 	}
 	printf("\r\n");
-	printf("%d\r\n",MQTT_ProcessPUBREC(outbuff, res, &messageid));
+	printf("%d\r\n",MQTT_ProcessPUBREC(m, outbuff, res, &messageid));
 	printf("%x\r\n", messageid);
 }
 
-void pubrel_test(void)
+void pubrel_test(MQTT_TCB *m)
 {
-	processpubrec();
-	MQTT_PUBREL(messageid);
-	for(i = 0; i < mqtt.length; i++)
+	processpubrec(m);
+	MQTT_PUBREL(m, messageid);
+	for(i = 0; i < m->length.totallength; i++)
 	{
-		printf("%02x ",mqtt.buff[i]);
+		printf("%02x ",m->buff[i]);
 	}
 }
 
-void processpubrel(void)
+void processpubrel(MQTT_TCB *m)
 {
 	gets(databuff);
 	res = Str_to_Hex(databuff, outbuff);
@@ -250,21 +254,21 @@ void processpubrel(void)
 		printf("%02x ",outbuff[i]);
 	}
 	printf("\r\n");
-	printf("%d\r\n",MQTT_ProcessPUBREL(outbuff, res, &messageid));
+	printf("%d\r\n",MQTT_ProcessPUBREL(m, outbuff, res, &messageid));
 	printf("%x\r\n", messageid);
 }
 
-void pubcomp_test(void)
+void pubcomp_test(MQTT_TCB *m)
 {
-	processpubrel();
-	MQTT_PUBCOMP(messageid);
-	for(i = 0; i < mqtt.length; i++)
+	processpubrel(m);
+	MQTT_PUBCOMP(m, messageid);
+	for(i = 0; i < m->length.totallength; i++)
 	{
-		printf("%02x ",mqtt.buff[i]);
+		printf("%02x ",m->buff[i]);
 	}
 }
 
-void processpubcomp(void)
+void processpubcomp(MQTT_TCB *m)
 {
 	gets(databuff);
 	res = Str_to_Hex(databuff, outbuff);
@@ -273,7 +277,7 @@ void processpubcomp(void)
 		printf("%02x ",outbuff[i]);
 	}
 	printf("\r\n");
-	printf("%d\r\n",MQTT_ProcessPUBCOMP(outbuff, res, &messageid));
+	printf("%d\r\n",MQTT_ProcessPUBCOMP(m, outbuff, res, &messageid));
 	printf("%x\r\n", messageid);
 }
 
