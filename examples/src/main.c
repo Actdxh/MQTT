@@ -46,19 +46,34 @@ MQTT_TCB MqttB;
 
 int main(int argc, char *argv[]) {
 
-	MQTT_Init(&MqttA, &configA);
+	res = MQTT_Init(&MqttA, &configA);
+	if(res != 0) {
+		printf("Failed to initialize MQTT Client A\r\n");
+		return -1;
+	}
 	// MQTT_Init(&MqttB, &configB);
 
-	// printf("MQTT Client A:\r\n");
-	// connect_test(&MqttA);
-	// printf("\r\n");
+	printf("MQTT Client A:\r\n");
+	connect_test(&MqttA);
+	printf("\r\n");
 
 	// connect_test(&MqttB);
 	// printf("\r\n");
 
-	// printf("MQTT Subscriptions:\r\n");
-	// subscribe_test(&MqttA);
-	// printf("\r\n");
+	printf("MQTT Subscriptions:\r\n");
+	subscribe_test(&MqttA);
+	printf("\r\n");
+
+	MQTT_SetOnMessage(&MqttA, my_on_message, NULL);
+	MQTT_SetOnSend(&MqttA, my_on_send, NULL);
+	const char* test_publish_hex = "32 0E 00 04 54 45 53 54 00 01 35 32 31 31 32 33";
+	uint8_t hex_buff[64];
+	int hex_len = Str_to_Hex((char*)test_publish_hex, hex_buff);
+	
+	res = MQTT_InputBytes(&MqttA, hex_buff, 3);
+	printf("MQTT_InputBytes result: %d\r\n", res);
+	res = MQTT_InputBytes(&MqttA, hex_buff + 3, hex_len - 3);
+	printf("MQTT_InputBytes result: %d\r\n", res);
 
 	// printf("MQTT Publications:\r\n");
 	// publish_test(&MqttA);
@@ -68,7 +83,7 @@ int main(int argc, char *argv[]) {
 	// unsubscribe_test(&MqttA);
 	// printf("\r\n");
 	
-	publish_pack_parse_test(&MqttA);
+	// publish_pack_parse_test(&MqttA);
 	
 
 

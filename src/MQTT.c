@@ -4,7 +4,7 @@
 #include "mqtt_utils.h"
 #include <stdint.h>
 #include "mqtt_parse.h"
-#define MQTT_DEBUG
+//#define MQTT_DEBUG
 
 
 int MQTT_Init(MQTT_TCB *m, const MQTT_config_t *config)
@@ -12,18 +12,35 @@ int MQTT_Init(MQTT_TCB *m, const MQTT_config_t *config)
 	if(m == NULL || config == NULL) {
 		return -1; // Invalid input
 	}
-	if(m->param.WillQoS > 2) {
+
+	if(config->WillQoS > 2) {
 		return -1; // Invalid Will QoS
+	}
+
+	if(config->ClientID[0] == '\0') {
+		return -1; // ClientID, UserName, and Passward cannot be empty
+	}
+	if(config->WillEnable) {
+		if(config->WillTopic[0] == '\0' || config->WillData[0] == '\0') {
+			return -1; // Will topic and data cannot be empty when Will is enabled
+		}
 	}
 	memset(m, 0, sizeof(*m));
 	m->param = *config;
-	m->length.cid_len = strlen(m->param.ClientID);
-	m->length.user_len = strlen(m->param.UserName);
-	m->length.pwd_len = strlen(m->param.Passward);
-	m->length.willtopic_len = strlen(m->param.WillTopic);
-	m->length.willdata_len = strlen(m->param.WillData);
+
+	m->length.cid_len = m->param.ClientID ? strlen(m->param.ClientID) : 0;
+	m->length.user_len = m->param.UserName ? strlen(m->param.UserName) : 0;
+	m->length.pwd_len = m->param.Passward ? strlen(m->param.Passward) : 0;
+	if(m->param.WillEnable) {
+		m->length.willtopic_len = m->param.WillTopic ? strlen(m->param.WillTopic) : 0;
+		m->length.willdata_len = m->param.WillData ? strlen(m->param.WillData) : 0;
+	} else {
+		m->length.willtopic_len = 0;
+		m->length.willdata_len = 0;
+	}
 	//m->length.topic_len = strlen(m->topic);
 	m->MessageID = 1;
+	m->rx_buf_len = 0;
 
 	return 0;
 }
@@ -31,11 +48,11 @@ int MQTT_Init(MQTT_TCB *m, const MQTT_config_t *config)
 int mqtt_pack_connect(MQTT_TCB*m, uint8_t* out, uint16_t out_size, uint16_t keepalive)
 {
 	uint16_t p = 0;
-	uint16_t cid_len = strlen(m->param.ClientID);
-	uint16_t user_len = strlen(m->param.UserName);
-	uint16_t pwd_len = strlen(m->param.Passward);
-	uint16_t willtopic_len = strlen(m->param.WillTopic);
-	uint16_t willdata_len = strlen(m->param.WillData);
+	uint16_t cid_len = m->param.ClientID ? strlen(m->param.ClientID) : 0;
+	uint16_t user_len = m->param.UserName ? strlen(m->param.UserName) : 0;
+	uint16_t pwd_len = m->param.Passward ? strlen(m->param.Passward) : 0;
+	uint16_t willtopic_len = m->param.WillTopic ? strlen(m->param.WillTopic) : 0;
+	uint16_t willdata_len = m->param.WillData ? strlen(m->param.WillData) : 0;
 	uint16_t Fixedheader_len = 0;
 	uint16_t Remaining_len = 0;
 	uint16_t Variableheader_len = 0;
@@ -242,7 +259,7 @@ int mqtt_pack_subscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const char
 
 int MQTT_SUBSCRIBE(MQTT_TCB *m, char* topic, char QS)												//一次制订阅一个主题 
 {
-	mqtt_pack_subscribe(m, m->buff, BUFF_SIZE, topic, QS);
+	return mqtt_pack_subscribe(m, m->buff, BUFF_SIZE, topic, QS);
 }
 
 /************************SUBACK函数*************************/ 
@@ -551,6 +568,149 @@ int mqtt_parse_publish_view(const uint8_t* rx, uint32_t rx_len, mqtt_publish_vie
 
 	return 0;
 }
+
+void my_on_message(void* user_ctx, const mqtt_publish_view_t* msg)
+{
+	uint32_t i;
+	printf("Received message:\n");
+	printf("Topic Length: %d\n", msg->topic_len);
+	printf("Topic: %.*s\n", msg->topic_len, msg->topic);
+	printf("Payload Length: %d\n", msg->payload_len);
+	
+	printf("Payload: ");
+	const uint8_t* pl = (const uint8_t*)msg->payload;
+	for(i = 0; i < msg->payload_len; i++) {
+		if(pl[i] >= 32 && pl[i] <= 126) {
+			printf("%c", pl[i]);
+		} else {
+			printf("."); // 非法/不可见字符显示为点
+		}
+	}
+	printf("\n");
+	
+	printf("QoS: %d\n", msg->qos);
+	printf("Retain: %d\n", msg->retain);
+	printf("DUP: %d\n", msg->dup);
+	printf("Packet ID: %d\n", msg->packet_id);
+};
+
+void my_on_send(void* user_ctx, const uint8_t* data, uint16_t len)
+{
+	uint16_t i; 
+    (void)user_ctx;
+
+    printf("TX %u bytes: ", (unsigned)len);
+    for (i = 0; i < len; i++) {
+        printf("%02X ", data[i]);
+    }
+    printf("\r\n");
+};
+
+void MQTT_SetOnMessage(MQTT_TCB* m, mqtt_on_message_cb cb, void* user_ctx)
+{
+	m->on_message = cb;
+	m->user_ctx = user_ctx;
+}
+
+void MQTT_SetOnSend(MQTT_TCB* m, mqtt_on_send_cb cb, void* user_ctx)
+{
+	m->on_send = cb;
+	m->user_ctx = user_ctx;
+}
+
+int MQTT_OnRx(MQTT_TCB* m, const uint8_t* rx_data, uint32_t rx_len)
+{
+	if (!m || !rx_data || rx_len < 2) return -1;
+	uint8_t type = rx_data[0] & 0xF0;
+	switch(type) {
+		case 0x30: { // PUBLISH
+			mqtt_publish_view_t view;
+			int res = mqtt_parse_publish_view(rx_data, rx_len, &view);
+			if(res == 0) {
+				if(view.qos == 0) {
+					if(m->on_message) 
+					{
+						m->on_message(m->user_ctx, &view);
+					}
+					return 1;//处理了qos0的包
+				} else if(view.qos == 1) {
+					// QoS 1 先发送 PUBACK 再调用回调函数
+					MQTT_PUBACK(m, view.packet_id);
+					if(m->on_send) {
+						m->on_send(m->user_ctx, m->buff, m->length.Totallength);
+					}
+					if(m->on_message) 
+					{
+						m->on_message(m->user_ctx, &view);
+					}
+					return 2;//处理了qos1的包
+				}
+				if(view.qos == 2) {
+					// QoS 2 先发送 PUBREC 等待 PUBREL 再调用回调函数，这里暂时不实现完整的 QoS 2 流程
+					return -1; //处理了qos2的包，但还没有完成整个流程,当前就是当时2服务等级的时候返回错误
+				}
+			} else {
+				return res; // 解析失败
+			}
+		}
+		// 这里可以添加对其他类型报文的处理，比如CONNACK、SUBACK等
+		default:
+			return 0; // Unhandled packet type
+	}
+}
+
+int MQTT_InputBytes(MQTT_TCB* m, const uint8_t* data, uint32_t len)
+{
+	if(m == NULL || data == NULL || len == 0) {
+	return -1; // Invalid input
+	}
+	if(len > sizeof(m->rx_buf)) {// 如果一次接收的数据长度超过缓冲区大小，直接丢弃并返回错误
+	return -1; 
+	}
+
+	int res = 0;
+	int frames = 0;
+	uint8_t rem_len_bytes;
+	uint32_t rem_len;
+	uint32_t frame_len;
+
+
+	if(len > sizeof(m->rx_buf) - m->rx_buf_len) {// 检查剩余缓冲区大小是否足够不够就清空缓冲区
+		m->rx_buf_len = 0;
+	}
+	memcpy(m->rx_buf+m->rx_buf_len, data, len);
+	m->rx_buf_len += len;
+	while(m->rx_buf_len >= 2)
+	{
+		res = mqtt_read_rem_len(m->rx_buf + 1, m->rx_buf_len - 1, &rem_len, &rem_len_bytes);
+		if(res == -2)
+		{
+			break; // 接收的包不完整，继续等待
+		}else if(res < 0)
+		{
+			memmove(m->rx_buf, m->rx_buf + 1, m->rx_buf_len - 1); // 移除第一个字节，继续尝试解析下一个包
+			m->rx_buf_len -= 1;
+			continue;
+		}
+		frame_len = 1 + rem_len_bytes + rem_len;
+		if(frame_len > m->rx_buf_len) {
+			break; // 接收的包不完整，继续等待
+		}
+		// 处理完整的 MQTT 包
+		res = MQTT_OnRx(m, m->rx_buf, frame_len);
+		// 移除已处理的包
+		if(frame_len == m->rx_buf_len) {
+			m->rx_buf_len = 0; // 刚好处理完所有数据，直接清空缓冲区
+			frames++;
+		} else if(frame_len < m->rx_buf_len) {
+			memmove(m->rx_buf, m->rx_buf + frame_len, m->rx_buf_len - frame_len);//这个函数是从buf里面往后面移一帧的数据放到前面来第三个参数要减的原因就是移动减去帧长的长度
+			m->rx_buf_len -= frame_len;
+			frames++;
+		}
+	}
+	return frames; // 返回处理的帧数
+}
+
 char MQTT_ProcessPUBLISH(MQTT_TCB *m, u8* rxdata, u32 rxdata_len, u8 *qs, u32* messageid)
 {
 	char i;

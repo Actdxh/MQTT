@@ -2,11 +2,17 @@
 #define __MQTT_H
 
 #include "cc.h"
+#include "mqtt_parse.h"
+
 
 #define PARA_SIZE 64
 #define BUFF_SIZE 256
 #define TOPIC_SIZE 256
 #define DATA_SIZE 256
+
+#ifndef MQTT_RXBUF_SIZE
+#define MQTT_RXBUF_SIZE 1024
+#endif
 
 typedef struct{
 	uint16_t cid_len;
@@ -23,8 +29,7 @@ typedef struct{
 }MQTT_length_t;
 
 
-typedef struct{
-	
+typedef struct{	
 	char ClientID[PARA_SIZE];				//参数缓冲区 
 	char UserName[PARA_SIZE];				//参数缓冲区 
 	char Passward[PARA_SIZE];				//参数缓冲区 
@@ -36,13 +41,22 @@ typedef struct{
 	char CleanSession;						//连接会话清除标志，1清除，0不清除
 }MQTT_config_t;
 
+typedef void (*mqtt_on_message_cb)(void* user_ctx, const mqtt_publish_view_t* msg);
+typedef void (*mqtt_on_send_cb)(void* user_ctx, const uint8_t* data, uint16_t len);
+
 typedef struct{
+	uint8_t  rx_buf[MQTT_RXBUF_SIZE];		//接收缓冲区			|这俩个是用在input函数里面处理服务器发来信息的接受缓冲
+	uint16_t rx_buf_len;					//接收缓冲区长度		|
+
 	uint32_t MessageID;						//报文标识符 
 	MQTT_length_t length;				    //长度结构体
-	unsigned char buff[BUFF_SIZE];			//数据缓冲区 
+	uint8_t buff[BUFF_SIZE];			//数据缓冲区 
 	MQTT_config_t	param;					//参数结构体
 	char topic[TOPIC_SIZE];					//接收到服务器推送的订阅的主题缓冲区 
-	u8 data[DATA_SIZE];						//接收到服务推送的数据 
+	uint8_t data[DATA_SIZE];						//接收到服务推送的数据
+	mqtt_on_message_cb on_message;			//消息回调函数指针
+	mqtt_on_send_cb on_send;					//发送回调函数指针
+	void* user_ctx;						//用户上下文指针，在回调函数中传递给用户使用
 }MQTT_TCB;
 
 typedef struct {
@@ -94,5 +108,17 @@ int mqtt_pack_publish(
     uint8_t dup        // 0/1（qos=0 时 dup 也允许但一般没意义）
 );
 int mqtt_pack_publish_two(MQTT_TCB* m,uint8_t* out,uint16_t out_size, mqtt_publish_params_t *params);
+int mqtt_parse_publish_view(const uint8_t* rx, uint32_t rx_len, mqtt_publish_view_t* view);
+int MQTT_OnRx(MQTT_TCB* m, const uint8_t* rx_data, uint32_t rx_len);
+
+
+
+void my_on_message(void* user_ctx, const mqtt_publish_view_t* msg);
+void my_on_send(void* user_ctx, const uint8_t* data, uint16_t len);
+
+void MQTT_SetOnMessage(MQTT_TCB* m, mqtt_on_message_cb cb, void* user_ctx);
+void MQTT_SetOnSend(MQTT_TCB* m, mqtt_on_send_cb cb, void* user_ctx);
+
+int MQTT_InputBytes(MQTT_TCB* m, const uint8_t* data, uint32_t len);
 #endif
 

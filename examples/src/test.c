@@ -19,7 +19,7 @@ void data_test(MQTT_TCB *m)
 
 void connect_test(MQTT_TCB *m)
 {
-	int ret = MQTT_CONNECT(m, 100);
+	int ret = MQTT_CONNECT(m, 10000);
 	if(ret < 0) {
 		printf("Failed to pack MQTT CONNECT message\r\n");
 		return;
@@ -184,7 +184,7 @@ void publish_pack_parse_test(MQTT_TCB *m)
 	assert(view.qos == params.qos);
 	assert(view.retain == params.retain);
 	assert(view.dup == params.dup);
-	assert(params.qos == 0 ? view.packet_id == 0 : view.packet_id != 0); // qos=1 时应该有报文标识符，且不为0（虽然协议允许为0但一般不这么用）
+	assert(params.qos == 0 ? view.packet_id == 0 : view.packet_id != 0);
 	assert(view.packet_len == res); // 包的总长度
 	assert(view.topic_len == strlen(params.topic));
 	assert(memcmp(view.topic, params.topic, view.topic_len) == 0);
