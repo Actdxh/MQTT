@@ -2,6 +2,7 @@
 #define __MQTT_PARSE_H
 
 #include <stdint.h>
+#include "MQTT.h"
 
 typedef struct {
     const uint8_t* topic;

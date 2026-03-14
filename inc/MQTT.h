@@ -1,7 +1,7 @@
 #ifndef __MQTT_H
 #define __MQTT_H
 
-#include "cc.h"
+#include <stdint.h>
 #include "mqtt_parse.h"
 
 
@@ -71,11 +71,22 @@ typedef struct{
 	char CleanSession;						//连接会话清除标志，1清除，0不清除
 }MQTT_config_t;
 
+typedef struct mqtt_publish_params_t {
+    const char* topic;
+    const void* payload;
+    uint16_t payload_len;
+
+    uint8_t qos;     // 0/1
+    uint8_t retain;  // 0/1
+    uint8_t dup;     // 0/1
+}mqtt_publish_params_t;
+
 typedef void (*mqtt_on_message_cb)(void* user_ctx, const mqtt_publish_view_t* msg);
 typedef void (*mqtt_on_send_cb)(void* user_ctx, const uint8_t* data, uint16_t len);
 typedef void (*mqtt_on_connack_cb)(void* user_ctx, const mqtt_connack_view_t* v);
 typedef void (*mqtt_on_suback_cb)(void* user_ctx, const mqtt_suback_view_t* v);
-typedef struct{
+
+typedef struct MQTT_TCB {
 	uint8_t  rx_buf[MQTT_RXBUF_SIZE];		//接收缓冲区		这是用在input函数里面处理服务器发来信息的接受缓冲
 	uint16_t rx_buf_len;					//接收缓冲区长度	这是用在input函数里面处理服务器发来信息的接受缓冲
 
@@ -97,70 +108,9 @@ typedef struct{
     uint8_t session_present;	// 最近一次 CONNACK session present 标志//用于调试
 }MQTT_TCB;
 
-typedef struct {
-    const char* topic;
-    const void* payload;
-    uint16_t payload_len;
-
-    uint8_t qos;     // 0/1
-    uint8_t retain;  // 0/1
-    uint8_t dup;     // 0/1
-}mqtt_publish_params_t;
-
-
-int MQTT_Init(MQTT_TCB *m, const MQTT_config_t *config);
-int MQTT_CONNECT(MQTT_TCB *m, u32 keepalive);
-int MQTT_SUBSCRIBE(MQTT_TCB *m, char* topic, char QS);
-char MQTT_CONNACK(MQTT_TCB *m, u8* rxdata, u32 rxdata_len);
-void MQTT_DISCONNECT(MQTT_TCB *m);
-char MQTT_SUBACK(MQTT_TCB *m, u8* rxdata, u32 rxdata_len); 
-int  MQTT_UNSUBSCRIBE(MQTT_TCB *m, char* topic);
-char MQTT_UNSUBACK(MQTT_TCB *m, u8* rxdata, u32 rxdata_len);
-void MQTT_PINGREQ(MQTT_TCB *m);
-char MQTT_PINGRESP(MQTT_TCB *m, u8* rxdata, u32 rxdata_len);
-void MQTT_PUBLISH0(MQTT_TCB *m, char retain, char* topic, u8 *data, u32 data_len);
-int MQTT_PUBLISH(MQTT_TCB *m, char dup, char QoS, char retain, char* topic, void *data, u32 data_len);
-char MQTT_ProcessPUBLISH(MQTT_TCB *m, u8* rxdata, u32 rxdata_len, u8 *qs, u32* messageid); 
-void MQTT_PUBACK(MQTT_TCB *m, u32 messageid);
-char MQTT_ProcessPublish(MQTT_TCB *m, u8* rxdata, u32 rxdata_len, u32* messageid);
-void MQTT_PUBREC(MQTT_TCB *m, u32 messageid);
-char MQTT_ProcessPUBREC(MQTT_TCB *m, u8* rxdata, u32 rxdata_len, u32* messageid);
-void MQTT_PUBREL(MQTT_TCB *m, u32 messageid); 
-char MQTT_ProcessPUBREL(MQTT_TCB *m, u8* rxdata, u32 rxdata_len, u32* messageid);
-void MQTT_PUBCOMP(MQTT_TCB *m, u32 messageid);
-char MQTT_ProcessPUBCOMP(MQTT_TCB *m, u8* rxdata, u32 rxdata_len, u32* messageid);
-
-
-const char* MQTT_RxEventStr(int code);
-
-int mqtt_pack_connect(MQTT_TCB*m, uint8_t* out, uint16_t out_size, uint16_t keepalive);
-int mqtt_pack_subscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const char * topic, char qos);
-int mqtt_pack_unsubscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, char * topic);
-int mqtt_pack_publish(
-    MQTT_TCB* m,
-    uint8_t* out,
-    uint16_t out_size,
-    const char* topic,
-    const void* payload,
-    uint16_t payload_len,
-    uint8_t qos,       // 0/1（先不做2）
-    uint8_t retain,    // 0/1
-    uint8_t dup        // 0/1（qos=0 时 dup 也允许但一般没意义）
-);
-int mqtt_pack_publish_two(MQTT_TCB* m,uint8_t* out,uint16_t out_size, mqtt_publish_params_t *params);
-int mqtt_parse_publish_view(const uint8_t* rx, uint32_t rx_len, mqtt_publish_view_t* view);
-int MQTT_OnRx(MQTT_TCB* m, const uint8_t* rx_data, uint32_t rx_len);
 
 
 
-void my_on_message(void* user_ctx, const mqtt_publish_view_t* msg);
-void my_on_send(void* user_ctx, const uint8_t* data, uint16_t len);
-void my_on_connack(void* user_ctx, const mqtt_connack_view_t* v);
 
-void MQTT_SetOnMessage(MQTT_TCB* m, mqtt_on_message_cb cb, void* user_ctx);
-void MQTT_SetOnSend(MQTT_TCB* m, mqtt_on_send_cb cb, void* user_ctx);
-void MQTT_SetOnConnack(MQTT_TCB* m, mqtt_on_connack_cb cb, void* user_ctx);
-
-int MQTT_InputBytes(MQTT_TCB* m, const uint8_t* data, uint32_t len);
 #endif
 

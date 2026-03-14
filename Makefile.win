@@ -4,8 +4,8 @@
 CPP      = g++.exe
 CC       = gcc.exe
 WINDRES  = windres.exe
-OBJ      = examples/src/main.o examples/src/test.o src/MQTT.o src/mqtt_utils.o src/mqtt_parse.o
-LINKOBJ  = examples/src/main.o examples/src/test.o src/MQTT.o src/mqtt_utils.o src/mqtt_parse.o
+OBJ      = examples/src/main.o src/mqtt_core.o src/mqtt_handlers.o src/mqtt_pack.o src/mqtt_parse.o src/mqtt_utils.o examples/src/app_cb.o examples/src/app_debug.o examples/src/app_demo.o
+LINKOBJ  = examples/src/main.o src/mqtt_core.o src/mqtt_handlers.o src/mqtt_pack.o src/mqtt_parse.o src/mqtt_utils.o examples/src/app_cb.o examples/src/app_debug.o examples/src/app_demo.o
 LIBS     = -L"E:/APPWORK/Dev-Cpp/MinGW64/lib" -L"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/lib" -static-libgcc -L"H:/GITHUB/MQTT/inc" -L"H:/GITHUB/MQTT/src" -L"H:/GITHUB/MQTT/examples/inc" -L"H:/GITHUB/MQTT/examples/src"
 INCS     = -I"E:/APPWORK/Dev-Cpp/MinGW64/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"H:/GITHUB/MQTT/inc" -I"H:/GITHUB/MQTT/examples/inc" -I"H:/GITHUB/MQTT/examples/src" -I"H:/GITHUB/MQTT/src"
 CXXINCS  = -I"E:/APPWORK/Dev-Cpp/MinGW64/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include/c++" -I"H:/GITHUB/MQTT/inc" -I"H:/GITHUB/MQTT/examples/inc" -I"H:/GITHUB/MQTT/examples/src" -I"H:/GITHUB/MQTT/src"
@@ -27,14 +27,26 @@ $(BIN): $(OBJ)
 examples/src/main.o: examples/src/main.c
 	$(CC) -c examples/src/main.c -o examples/src/main.o $(CFLAGS)
 
-examples/src/test.o: examples/src/test.c
-	$(CC) -c examples/src/test.c -o examples/src/test.o $(CFLAGS)
+src/mqtt_core.o: src/mqtt_core.c
+	$(CC) -c src/mqtt_core.c -o src/mqtt_core.o $(CFLAGS)
 
-src/MQTT.o: src/MQTT.c
-	$(CC) -c src/MQTT.c -o src/MQTT.o $(CFLAGS)
+src/mqtt_handlers.o: src/mqtt_handlers.c
+	$(CC) -c src/mqtt_handlers.c -o src/mqtt_handlers.o $(CFLAGS)
+
+src/mqtt_pack.o: src/mqtt_pack.c
+	$(CC) -c src/mqtt_pack.c -o src/mqtt_pack.o $(CFLAGS)
+
+src/mqtt_parse.o: src/mqtt_parse.c
+	$(CC) -c src/mqtt_parse.c -o src/mqtt_parse.o $(CFLAGS)
 
 src/mqtt_utils.o: src/mqtt_utils.c
 	$(CC) -c src/mqtt_utils.c -o src/mqtt_utils.o $(CFLAGS)
 
-src/mqtt_parse.o: src/mqtt_parse.c
-	$(CC) -c src/mqtt_parse.c -o src/mqtt_parse.o $(CFLAGS)
+examples/src/app_cb.o: examples/src/app_cb.c
+	$(CC) -c examples/src/app_cb.c -o examples/src/app_cb.o $(CFLAGS)
+
+examples/src/app_debug.o: examples/src/app_debug.c
+	$(CC) -c examples/src/app_debug.c -o examples/src/app_debug.o $(CFLAGS)
+
+examples/src/app_demo.o: examples/src/app_demo.c
+	$(CC) -c examples/src/app_demo.c -o examples/src/app_demo.o $(CFLAGS)

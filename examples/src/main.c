@@ -1,20 +1,16 @@
-#include "main.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include "MQTT.h"
-#include "cc.h"
-#include <string.h>
-#include "test.h"
-#include "mqtt_utils.h"
-#include <stdint.h>
+#include "app_demo.h"
+#include "main.h"
+
 /* run this program using the console pauser or add your own getch, system("pause") or input loop */
 
 int i;
 int res;
-u8 databuff[64];
-u8 outbuff[64];
-u8 QoS;
-u32 messageid;
+uint8_t databuff[64];
+uint8_t outbuff[64];
+uint8_t QoS;
+uint32_t messageid;
 
 MQTT_config_t configA = {
 	.ClientID = "USER001",

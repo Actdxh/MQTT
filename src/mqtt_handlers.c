@@ -1,3 +1,88 @@
 #include "mqtt_pack.h"
 #include "mqtt_utils.h"
 #include "mqtt_parse.h"
+#include "mqtt_handlers.h"
+#include "mqtt_core.h"
+#include "MQTT.h"
+
+
+
+
+int mqtt_handle_publish(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
+{
+	mqtt_publish_view_t view;
+			int res = mqtt_parse_publish_view(rx, rx_len, &view);
+			if(res == 0) {
+				if(view.qos == 0) {
+					mqtt_emit_message(m, &view);
+					return MQTT_RX_PUBLISH_QOS0;//处理了qos0的包
+				} else if(view.qos == 1) {
+					// QoS 1 先发送 PUBACK 再调用回调函数
+					MQTT_PUBACK(m, view.packet_id);
+					mqtt_emit_send(m);
+					mqtt_emit_message(m, &view);
+					if(m->on_send) {
+						return MQTT_RX_PUBLISH_QOS1_ACKED;//处理了qos1的包并且已经发送了ack
+					}
+					return MQTT_RX_PUBLISH_QOS1;//处理了qos1的包
+				}
+				if(view.qos == 2) {
+					// QoS 2 先发送 PUBREC 等待 PUBREL 再调用回调函数，这里暂时不实现完整的 QoS 2 流程
+					return MQTT_RX_PUBLISH_QOS2_UNSUPPORTED; //处理了qos2的包，但还没有完成整个流程,当前就是当是2服务等级的时候返回错误
+				}
+			} else {
+				return res; // 解析失败
+			}
+}
+
+int mqtt_handle_connack(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
+{
+	if(m == NULL) {
+		return MQTT_ERR_ARG; // Invalid MQTT control block
+	}
+	mqtt_connack_view_t view;
+	int res = mqtt_parse_connack_view(rx, rx_len, &view);
+	
+	m->connack_rc = view.return_code;
+	m->session_present = view.session_present;
+	if (view.return_code == 0) {
+		m->conn_state = MQTT_CONN_CONNECTED;
+	} else {
+		m->conn_state = MQTT_CONN_DISCONNECTED;
+	}
+	if(m->on_connack) {
+		m->on_connack(m->user_ctx, &view);//需要注意的是这个回调是在return之前，所以就算是错的也要考虑
+	}
+	if(res < 0) {
+		return res; // 解析失败
+	}
+	//这里可以考虑加回调
+	return MQTT_RX_CONNACK; // 处理了 CONNACK 包
+}
+int mqtt_handle_suback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
+{
+	if(m == NULL) {
+		return MQTT_ERR_ARG; // Invalid MQTT control block
+	}
+	mqtt_suback_view_t view;
+	int res = mqtt_parse_suback_view(rx, rx_len, &view);
+	if(res < 0) {
+		return res; // 解析失败
+	}
+	if(view.packet_id != m->last_subscribe_pid) {
+		return MQTT_ERR_PID_MISMATCH; // SUBACK 的消息 ID 不匹配
+	}
+	if(m->on_suback) {
+		m->on_suback(m->user_ctx, &view);
+	}
+	return MQTT_RX_SUBACK; // 处理了 SUBACK 包
+}
+int mqtt_handle_pingresp(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
+{
+
+}
+int mqtt_handle_puback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
+{
+
+}
+
