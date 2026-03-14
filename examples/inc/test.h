@@ -24,7 +24,7 @@ void pubrel_test(MQTT_TCB *m);
 void pubcomp_test(MQTT_TCB *m);
 void processpubcomp(MQTT_TCB *m);
 
-
+void publish_pack_parse_test(MQTT_TCB *m); 
 
 #endif
 

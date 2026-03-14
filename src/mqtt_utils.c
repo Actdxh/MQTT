@@ -67,13 +67,8 @@ int mqtt_read_rem_len(const uint8_t* in,uint32_t in_len,uint32_t* rem_len,uint8_
 		(*rem_len_bytes) ++;
 		*rem_len += (in[i] & 0x7F) * multiplier;
 		multiplier *= 128;
-		if((in[i] & 0x80) == 0) break;
-		if((i == 3) && (in[i] & 0x80)) {
-			return -3; // 格式非法，剩余长度超过4字节
-		}
-	}
-	if(*rem_len_bytes > 4) {
-		return -3; // 格式非法
+		if((in[i] & 0x80) == 0) return 0; // 解析成功
+		if((i == 3) && (in[i] & 0x80)) return -3; // 格式非法，剩余长度超过4字节
 	}
 	return 0;
 }

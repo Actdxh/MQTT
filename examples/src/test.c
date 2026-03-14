@@ -5,8 +5,9 @@
 #include "cc.h"
 #include <string.h>
 #include "test.h"
-
-
+#include "mqtt_utils.h"
+#include "mqtt_parse.h"
+#include <assert.h>
 
 
 void data_test(MQTT_TCB *m)
@@ -162,11 +163,35 @@ void publish_test(MQTT_TCB *m)
 		printf("%02x ",m->buff[i]);
 	}
 	printf("\r\n");
+}
 
-
-
+void publish_pack_parse_test(MQTT_TCB *m)
+{
+	mqtt_publish_params_t params = {
+	.topic = "TEST",
+	.payload = "testnum:0x23",
+	.payload_len = sizeof("testnum:0x23") - 1, // 不包括字符串结尾的'\0'
+	.qos = 1,
+	.retain = 0,
+	.dup = 0
+	};
 	
+	res = mqtt_pack_publish_two(m, m->buff, BUFF_SIZE, &params);
 
+	mqtt_publish_view_t view;
+	mqtt_parse_publish_view(m->buff, res, &view);
+
+	assert(view.qos == params.qos);
+	assert(view.retain == params.retain);
+	assert(view.dup == params.dup);
+	assert(params.qos == 0 ? view.packet_id == 0 : view.packet_id != 0); // qos=1 时应该有报文标识符，且不为0（虽然协议允许为0但一般不这么用）
+	assert(view.packet_len == res); // 包的总长度
+	assert(view.topic_len == strlen(params.topic));
+	assert(memcmp(view.topic, params.topic, view.topic_len) == 0);
+	assert(view.payload_len == params.payload_len);
+	assert(memcmp(view.payload, params.payload, view.payload_len) == 0);
+
+	printf("Publish_pack_parse Successful!\r\n");
 }
 
 void processpublish_test(MQTT_TCB *m)
