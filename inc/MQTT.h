@@ -14,6 +14,36 @@
 #define MQTT_RXBUF_SIZE 1024
 #endif
 
+typedef enum {
+    MQTT_CONN_DISCONNECTED = 0,
+    MQTT_CONN_CONNECTED = 1,
+} mqtt_conn_state_t;
+
+typedef enum {
+    MQTT_RX_UNHANDLED = 0,
+
+    MQTT_RX_CONNACK = 1,
+    MQTT_RX_SUBACK  = 2,
+    MQTT_RX_PINGRESP= 3,
+
+    MQTT_RX_PUBACK  = 4,
+
+    MQTT_RX_PUBLISH_QOS0 = 10,
+    MQTT_RX_PUBLISH_QOS1 = 11,          // 收到 QoS1 PUBLISH（已解析）
+    MQTT_RX_PUBLISH_QOS1_ACKED = 12,    // QoS1 且已生成并触发 on_send 发送 PUBACK
+	
+
+    MQTT_RX_PUBLISH_QOS2_UNSUPPORTED = 19,
+} mqtt_rx_event_t;
+
+typedef enum {
+    MQTT_ERR_ARG        	= -1,// 参数错误
+    MQTT_ERR_INCOMPLETE 	= -2,// 包不完整
+    MQTT_ERR_MALFORMED  	= -3,// 包格式错误
+    MQTT_ERR_UNSUPPORTED	= -4,// 不支持的功能，比如 QoS 2
+	MQTT_ERR_PID_MISMATCH 	= -5, // SUBACK 的报文标识符与最近一次 SUBSCRIBE 不匹配
+} mqtt_err_t;
+
 typedef struct{
 	uint16_t cid_len;
 	uint16_t user_len;
@@ -43,10 +73,11 @@ typedef struct{
 
 typedef void (*mqtt_on_message_cb)(void* user_ctx, const mqtt_publish_view_t* msg);
 typedef void (*mqtt_on_send_cb)(void* user_ctx, const uint8_t* data, uint16_t len);
-
+typedef void (*mqtt_on_connack_cb)(void* user_ctx, const mqtt_connack_view_t* v);
+typedef void (*mqtt_on_suback_cb)(void* user_ctx, const mqtt_suback_view_t* v);
 typedef struct{
-	uint8_t  rx_buf[MQTT_RXBUF_SIZE];		//接收缓冲区			|这俩个是用在input函数里面处理服务器发来信息的接受缓冲
-	uint16_t rx_buf_len;					//接收缓冲区长度		|
+	uint8_t  rx_buf[MQTT_RXBUF_SIZE];		//接收缓冲区		这是用在input函数里面处理服务器发来信息的接受缓冲
+	uint16_t rx_buf_len;					//接收缓冲区长度	这是用在input函数里面处理服务器发来信息的接受缓冲
 
 	uint32_t MessageID;						//报文标识符 
 	MQTT_length_t length;				    //长度结构体
@@ -56,7 +87,14 @@ typedef struct{
 	uint8_t data[DATA_SIZE];						//接收到服务推送的数据
 	mqtt_on_message_cb on_message;			//消息回调函数指针
 	mqtt_on_send_cb on_send;					//发送回调函数指针
+	mqtt_on_connack_cb on_connack;			//连接确认回调函数指针
+	mqtt_on_suback_cb on_suback;			//订阅确认回调函数指针
 	void* user_ctx;						//用户上下文指针，在回调函数中传递给用户使用
+	uint16_t last_event_code;					//上次接收事件的事件代码，主要用于调试，被使用在input函数里面
+	uint16_t last_subscribe_pid;
+	mqtt_conn_state_t conn_state;
+    uint8_t connack_rc;          // 最近一次 CONNACK return code//用于调试
+    uint8_t session_present;	// 最近一次 CONNACK session present 标志//用于调试
 }MQTT_TCB;
 
 typedef struct {
@@ -93,6 +131,8 @@ void MQTT_PUBCOMP(MQTT_TCB *m, u32 messageid);
 char MQTT_ProcessPUBCOMP(MQTT_TCB *m, u8* rxdata, u32 rxdata_len, u32* messageid);
 
 
+const char* MQTT_RxEventStr(int code);
+
 int mqtt_pack_connect(MQTT_TCB*m, uint8_t* out, uint16_t out_size, uint16_t keepalive);
 int mqtt_pack_subscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const char * topic, char qos);
 int mqtt_pack_unsubscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, char * topic);
@@ -115,9 +155,11 @@ int MQTT_OnRx(MQTT_TCB* m, const uint8_t* rx_data, uint32_t rx_len);
 
 void my_on_message(void* user_ctx, const mqtt_publish_view_t* msg);
 void my_on_send(void* user_ctx, const uint8_t* data, uint16_t len);
+void my_on_connack(void* user_ctx, const mqtt_connack_view_t* v);
 
 void MQTT_SetOnMessage(MQTT_TCB* m, mqtt_on_message_cb cb, void* user_ctx);
 void MQTT_SetOnSend(MQTT_TCB* m, mqtt_on_send_cb cb, void* user_ctx);
+void MQTT_SetOnConnack(MQTT_TCB* m, mqtt_on_connack_cb cb, void* user_ctx);
 
 int MQTT_InputBytes(MQTT_TCB* m, const uint8_t* data, uint32_t len);
 #endif

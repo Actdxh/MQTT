@@ -53,8 +53,6 @@ int main(int argc, char *argv[]) {
 	}
 	// MQTT_Init(&MqttB, &configB);
 
-	printf("configA.ClientID[0]=0x%02X\n", (unsigned char)configA.ClientID[0]);
-	printf("configA.ClientID=\"%s\"\n", configA.ClientID);
 
 	printf("MQTT Client A:\r\n");
 	connect_test(&MqttA);
@@ -74,17 +72,31 @@ int main(int argc, char *argv[]) {
 	int hex_len = Str_to_Hex((char*)test_publish_hex, hex_buff);
 	
 	res = MQTT_InputBytes(&MqttA, hex_buff, 3);
-	printf("MQTT_InputBytes result: %d\r\n", res);
+	printf("MQTT_InputBytes result=%d\n", res);
+	printf("OnRx: %s (%d)\n", MQTT_RxEventStr(MqttA.last_event_code), MqttA.last_event_code);
 	res = MQTT_InputBytes(&MqttA, hex_buff + 3, hex_len - 3);
-	printf("MQTT_InputBytes result: %d\r\n", res);
+	printf("MQTT_InputBytes result=%d\n", res);
+	printf("OnRx: %s (%d)\n", MQTT_RxEventStr(MqttA.last_event_code), MqttA.last_event_code);
 
-	// printf("MQTT Publications:\r\n");
-	// publish_test(&MqttA);
-	// printf("\r\n");
+	const char* connack_hex = "20 02 00 00";
+	uint8_t b[8];
+	int n = Str_to_Hex((char*)connack_hex, b);
+	res = MQTT_InputBytes(&MqttA, b, n);
+	printf("MQTT_InputBytes result=%d\n", res);
+	printf("OnRx: %s (%d)\n", MQTT_RxEventStr(MqttA.last_event_code), MqttA.last_event_code);
 
-	// printf("MQTT Unsubscriptions:\r\n");
-	// unsubscribe_test(&MqttA);
-	// printf("\r\n");
+/*
+验证pubulish_pack和mqtt_parse_publish_view的正确性
+	printf("MQTT Publications:\r\n");
+	publish_test(&MqttA);
+	printf("\r\n");
+*/
+/*
+验证unsubscribe功能
+	printf("MQTT Unsubscriptions:\r\n");
+	unsubscribe_test(&MqttA);
+	printf("\r\n");
+*/
 	
 	// publish_pack_parse_test(&MqttA);
 	

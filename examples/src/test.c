@@ -19,9 +19,9 @@ void data_test(MQTT_TCB *m)
 
 void connect_test(MQTT_TCB *m)
 {
-    printf("[connect_test] enter\n");
+    // printf("[connect_test] enter\n");
     int ret = MQTT_CONNECT(m, 10000);
-    printf("[connect_test] MQTT_CONNECT ret=%d, Totallength=%lu\n", ret, (unsigned long)m->length.Totallength);
+    // printf("[connect_test] MQTT_CONNECT ret=%d, Totallength=%lu\n", ret, (unsigned long)m->length.Totallength);
 
     if(ret < 0) {
         printf("Failed to pack MQTT CONNECT message\r\n");
@@ -58,9 +58,9 @@ void disconnect_test(MQTT_TCB *m)
 
 void subscribe_test(MQTT_TCB *m)
 {
-	printf("[subscribe_test] enter\n");
+	// printf("[subscribe_test] enter\n");
 	res = MQTT_SUBSCRIBE(m, "TEST", 1);
-	printf("[subscribe_test] MQTT_SUBSCRIBE ret=%d, Totallength=%lu\n", res, (unsigned long)m->length.Totallength);
+	// printf("[subscribe_test] MQTT_SUBSCRIBE ret=%d, Totallength=%lu\n", res, (unsigned long)m->length.Totallength);
 	if(res < 0) {
 		printf("Failed to pack MQTT SUBSCRIBE message\r\n");
 		return;
@@ -69,6 +69,7 @@ void subscribe_test(MQTT_TCB *m)
 	{
 		printf("%02x ",m->buff[i]);
 	}
+	printf("\r\n");
 }
 
 void suback_test(MQTT_TCB *m)
