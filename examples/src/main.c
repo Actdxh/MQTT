@@ -53,6 +53,9 @@ int main(int argc, char *argv[]) {
 	}
 	// MQTT_Init(&MqttB, &configB);
 
+	printf("configA.ClientID[0]=0x%02X\n", (unsigned char)configA.ClientID[0]);
+	printf("configA.ClientID=\"%s\"\n", configA.ClientID);
+
 	printf("MQTT Client A:\r\n");
 	connect_test(&MqttA);
 	printf("\r\n");
