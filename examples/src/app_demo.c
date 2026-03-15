@@ -20,8 +20,13 @@ void app_demo(void)
     MQTT_SetOnMessage(&MqttA, my_on_message, NULL);
 	MQTT_SetOnSend(&MqttA, my_on_send, NULL);
     app_demo_connect(&MqttA);
+    app_demo_conack(&MqttA);
     app_demo_subscribe(&MqttA);
+    app_demo_suback(&MqttA);
+    app_demo_unsubscribe(&MqttA);
     app_demo_publish(&MqttA);
+    app_demo_puback_myself(&MqttA); // 解析自己发送的 PUBLISH 报文，触发回调函数
+    app_demo_puback(&MqttA);
     app_demo_disconnect(&MqttA);
 }
 
@@ -70,7 +75,7 @@ int app_demo_connect(MQTT_TCB* m)
 {
     //这是一个连接服务器的示例，展示了如何使用 MQTT_pack_connect 函数来构建连接报文，并通过回调函数处理服务器的响应
     printf("MQTT Client A Connect:\r\n");
-	res = mqtt_pack_connect(m, m->buff, m->length.Totallength, 10000);
+	res = mqtt_pack_connect(m, m->buff,BUFF_SIZE, 10000);
     if(res < 0) {
         #ifdef MQTT_DEMO_DEBUG
         printf("Failed to pack MQTT CONNECT message res: %d\r\n", res);
@@ -106,7 +111,7 @@ int app_demo_conack(MQTT_TCB* m)
 int app_demo_subscribe(MQTT_TCB* m)
 {
     //这是一个订阅主题的示例，展示了如何使用 MQTT_pack_subscribe 函数来构建订阅报文，并通过回调函数处理服务器的响应
-    res = mqtt_pack_subscribe(m, m->buff, m->length.Totallength, "TEST", 1);
+    res = mqtt_pack_subscribe(m, m->buff, BUFF_SIZE, "TEST", 1);
     if(res < 0) {
         #ifdef MQTT_DEMO_DEBUG
         printf("Failed to pack MQTT SUBSCRIBE message res: %d\r\n", res);
@@ -125,10 +130,25 @@ int app_demo_subscribe(MQTT_TCB* m)
     return res;
 }
 
+int app_demo_suback(MQTT_TCB* m)
+{
+    //这是输入一串服务端发送来的suback报文来解析确认是suback报文然后再input里面调用了onrx,onrx再调用了回调函数，回调函数要自己去定义，这里只是打印对数据解析
+    const char* test_suback_hex = "90 03 00 01 00";
+    uint8_t hex_buff[64];
+    int hex_len = Str_to_Hex((char*)test_suback_hex, hex_buff);
+    
+    res = MQTT_InputBytes(m, (const uint8_t*)hex_buff, (uint16_t)hex_len);
+    #ifdef MQTT_DEMO_DEBUG
+    printf("MQTT_InputBytes result=%d\n", res);
+    printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->last_event_code), m->last_event_code);
+    #endif // DEBUG
+    return res;
+}
+
 int app_demo_unsubscribe(MQTT_TCB* m)
 {
     //这是一个取消订阅的示例，展示了如何使用 MQTT_pack_unsubscribe 函数来构建取消订阅报文
-    res = mqtt_pack_unsubscribe(m, m->buff, m->length.Totallength, "TEST");
+    res = mqtt_pack_unsubscribe(m, m->buff, BUFF_SIZE, "TEST");
     if(res < 0) {
         #ifdef MQTT_DEMO_DEBUG
         printf("Failed to pack MQTT UNSUBSCRIBE message res: %d\r\n", res);
@@ -158,7 +178,7 @@ int app_demo_publish(MQTT_TCB* m)
         .retain = 0,
         .dup = 0
     };
-    res = mqtt_pack_publish_two(m, m->buff, m->length.Totallength, &params);
+    res = mqtt_pack_publish_two(m, m->buff, BUFF_SIZE, &params);
     if(res < 0) {
         #ifdef MQTT_DEMO_DEBUG
         printf("Failed to pack MQTT PUBLISH message res: %d\r\n", res);
@@ -177,6 +197,19 @@ int app_demo_publish(MQTT_TCB* m)
     return res;
 }
 
+int app_demo_puback_myself(MQTT_TCB* m)
+{
+    //这个要紧接着在publish后面，这还是对自己发送出去的publish报文的解析
+    #ifdef MQTT_DEMO_DEBUG
+    printf("Start parse myself publish message:\r\n");
+    #endif // DEBUG
+	res = MQTT_InputBytes(m, (const uint8_t*)m->buff, m->length.Totallength);
+    #ifdef MQTT_DEMO_DEBUG
+	printf("MQTT_InputBytes result=%d\n", res);
+	printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->last_event_code), m->last_event_code);
+    #endif // DEBUG
+    return res;
+}
 
 
 int app_demo_puback(MQTT_TCB* m)

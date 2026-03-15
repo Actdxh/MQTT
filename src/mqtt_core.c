@@ -112,6 +112,7 @@ int MQTT_InputBytes(MQTT_TCB* m, const uint8_t* data, uint32_t len)
 		}
 		// 处理完整的 MQTT 包
 		res = MQTT_OnRx(m, m->rx_buf, frame_len);
+		m->last_event_code = res; // 记录上次事件代码，方便调试
 		#ifdef MQTT_DEBUG
 		printf("OnRx:return :%d\n", res);
 		#endif

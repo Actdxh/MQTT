@@ -19,6 +19,7 @@ int app_demo_init(MQTT_TCB* m);
 int app_demo_connect(MQTT_TCB* m);
 int app_demo_conack(MQTT_TCB* m);
 int app_demo_subscribe(MQTT_TCB* m);
+int app_demo_suback(MQTT_TCB* m);
 int app_demo_unsubscribe(MQTT_TCB* m);
 int app_demo_publish(MQTT_TCB* m);
 int app_demo_puback(MQTT_TCB* m);
