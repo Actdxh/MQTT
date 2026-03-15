@@ -126,7 +126,7 @@ typedef void (*mqtt_on_message_cb)(void* user_ctx, const mqtt_publish_view_t* ms
 typedef void (*mqtt_on_send_cb)(void* user_ctx, const uint8_t* data, uint16_t len);
 typedef void (*mqtt_on_connack_cb)(void* user_ctx, const mqtt_connack_view_t* v);
 typedef void (*mqtt_on_suback_cb)(void* user_ctx, const mqtt_suback_view_t* v);
-typedef void (*mqtt_on_pingresp_cb)(void* user_ctx, uint8_t state);
+typedef void (*mqtt_on_pingresp_cb)(void* user_ctx);
 typedef void (*mqtt_on_puback_cb)(void* user_ctx, const mqtt_puback_view_t* v);
 
 typedef struct{

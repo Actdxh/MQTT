@@ -72,19 +72,16 @@ void my_on_suback(void* user_ctx, const mqtt_suback_view_t* v)
 	ctx->subscribed = MQTT_SUBSCRIBED_ONE; // 标记为已订阅
 }
 
-void my_on_pingresp(void* user_ctx, uint8_t state)
+void my_on_pingresp(void* user_ctx)
 {
 	if(!user_ctx) {
 		return; // 无效的用户上下文
 	}
 	(void)user_ctx;
-	printf("Received PINGRESP from server\n");
-	// 这里可以添加其他处理逻辑，比如重置心跳计时器等或者看看服务器响应与否来看看服务器是否在线等
-	if (state == 1) {
-		printf("Server is online\n");
-	} else {
-		printf("pingresp is invalid\n");
-	}
+	//当进入这个回调的时候就代表服务器收到了ping,可以摘这里写某个值等于当前的tick，例如stm32的get_tick
+	//然后再业务层就可以开一个定时器或者看门狗来根据这个值判断是否需要重启或者重启连接
+	//只有当业务层检测到timeout的时候才进行其他操作
+	//eg:ctx->last_pingresp_tick = get_tick();
 
 }
 

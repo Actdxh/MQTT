@@ -153,9 +153,9 @@ int mqtt_parse_puback_view(const uint8_t* rx, uint32_t rx_len, mqtt_puback_view_
 	view->packet_id = (uint16_t)(rx[idx] << 8 | rx[idx + 1]);
 	return 0;
 }
-int mqtt_parse_pingresp(const uint8_t* rx, uint32_t rx_len, uint8_t* state)
+int mqtt_parse_pingresp(const uint8_t* rx, uint32_t rx_len)
 {
-	if(rx == NULL || state == NULL) {
+	if(rx == NULL) {
 		return MQTT_ERR_ARG; // 参数错误
 	}
 	if(rx_len < 2) {
@@ -170,9 +170,7 @@ int mqtt_parse_pingresp(const uint8_t* rx, uint32_t rx_len, uint8_t* state)
 		return MQTT_ERR_MALFORMED; // Error reading remaining length
 	}
 	if(rx[0] != 0xD0 || rem_len != 0 || rem_len_bytes != 1) {
-		*state = 0; // 标记pingresp is invalid
 		return MQTT_ERR_MALFORMED; // PINGRESP包格式错误
 	}
-	*state = 1; // 标记为服务器在线
 	return 0; // Success
 }

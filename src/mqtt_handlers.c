@@ -87,13 +87,12 @@ int mqtt_handle_pingresp(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 	if(rx_len < 2) {
 		return MQTT_ERR_INCOMPLETE; // 包不完整，PINGRESP最短是2字节
 	}
-	uint8_t state;
-	int res = mqtt_parse_pingresp(rx, rx_len, &state);
+	int res = mqtt_parse_pingresp(rx, rx_len);
 	if(res < 0) {
 		return res; // 解析失败
 	}
 	if(m->on_pingresp) {
-		m->on_pingresp(m->user_ctx, state);
+		m->on_pingresp(m->user_ctx);
 	}
 	return MQTT_RX_PINGRESP; // 处理了 PINGRESP 包
 }
