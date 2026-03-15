@@ -14,10 +14,14 @@ void my_on_suback(void* user_ctx, const mqtt_suback_view_t* v);
 /*--------------------调试打印功能函数-------------------------*/
 const char* MQTT_RxEventStr(int code);
 
-void app_demo();
-void app_demo_connect();
-void app_demo_subscribe();
-void app_demo_publish();
-void app_demo_disconnect();
+void app_demo(void);
+int app_demo_init(MQTT_TCB* m);
+int app_demo_connect(MQTT_TCB* m);
+int app_demo_conack(MQTT_TCB* m);
+int app_demo_subscribe(MQTT_TCB* m);
+int app_demo_unsubscribe(MQTT_TCB* m);
+int app_demo_publish(MQTT_TCB* m);
+int app_demo_puback(MQTT_TCB* m);
+int app_demo_disconnect(MQTT_TCB* m);
 
 #endif // __APP_DEMO_H
