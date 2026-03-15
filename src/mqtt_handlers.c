@@ -10,8 +10,11 @@
 
 int mqtt_handle_publish(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 {
-	if(m == NULL || rx == NULL || rx_len == 0) {
+	if(m == NULL || rx == NULL) {
 		return MQTT_ERR_ARG; // Invalid MQTT control block
+	}
+	if(rx_len < 2) {
+		return MQTT_ERR_INCOMPLETE; // 包不完整，PUBLISH最短是2字节
 	}
 	mqtt_publish_view_t view;
 			int res = mqtt_parse_publish_view(rx, rx_len, &view);
@@ -41,8 +44,11 @@ int mqtt_handle_publish(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 
 int mqtt_handle_connack(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 {
-	if(m == NULL || rx == NULL || rx_len == 0) {
+	if(m == NULL || rx == NULL) {
 		return MQTT_ERR_ARG; // Invalid MQTT control block
+	}
+	if(rx_len < 2) {
+		return MQTT_ERR_INCOMPLETE; // 包不完整，CONNACK最短是2字节
 	}
 	mqtt_connack_view_t view;
 	int res = mqtt_parse_connack_view(rx, rx_len, &view);
@@ -60,8 +66,11 @@ int mqtt_handle_connack(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 }
 int mqtt_handle_suback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 {
-	if(m == NULL || rx == NULL || rx_len == 0) {
+	if(m == NULL || rx == NULL) {
 		return MQTT_ERR_ARG; // Invalid MQTT control block
+	}
+	if(rx_len < 2) {
+		return MQTT_ERR_INCOMPLETE; // 包不完整，SUBACK最短是2字节
 	}
 	mqtt_suback_view_t view;
 	int res = mqtt_parse_suback_view(rx, rx_len, &view);
