@@ -48,11 +48,6 @@ int mqtt_handle_connack(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 	}
 	m->connack_rc = view.return_code;
 	m->session_present = view.session_present;
-	if (view.return_code == 0) {
-		m->user_ctx->connected = MQTT_CONN_CONNECTED;
-	} else {
-		m->user_ctx->connected = MQTT_CONN_DISCONNECTED;
-	}
 	if(m->on_connack) {
 		m->on_connack(m->user_ctx, &view);//需要注意的是这个回调是在return之前，所以就算是错的也要考虑
 	}
@@ -76,8 +71,6 @@ int mqtt_handle_suback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 	if(view.return_codes == NULL || view.return_codes_len == 0) {
 		return MQTT_ERR_MALFORMED; // SUBACK 中没有返回码
 	}
-	m->user_ctx->subscribed = MQTT_SUBSCRIBED_ONE; // 标记为已订阅
-
 	if(m->on_suback) {
 		m->on_suback(m->user_ctx, &view);
 	}

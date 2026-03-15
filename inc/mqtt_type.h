@@ -137,7 +137,7 @@ typedef struct{
 	mqtt_on_send_cb on_send;					//发送回调函数指针
 	mqtt_on_connack_cb on_connack;			//连接确认回调函数指针
 	mqtt_on_suback_cb on_suback;			//订阅确认回调函数指针
-	app_ctx_t* user_ctx;						//用户上下文指针，在回调函数中传递给用户使用
+	void* user_ctx;						//用户上下文指针，在回调函数中传递给用户使用
 	uint16_t last_event_code;					//上次接收事件的事件代码，主要用于调试，被使用在input函数里面
 	uint16_t last_subscribe_pid;
     uint8_t connack_rc;          // 最近一次 CONNACK return code//用于调试
