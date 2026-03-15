@@ -10,6 +10,9 @@
 
 int mqtt_handle_publish(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 {
+	if(m == NULL || rx == NULL || rx_len == 0) {
+		return MQTT_ERR_ARG; // Invalid MQTT control block
+	}
 	mqtt_publish_view_t view;
 			int res = mqtt_parse_publish_view(rx, rx_len, &view);
 			if(res == 0) {
@@ -38,7 +41,7 @@ int mqtt_handle_publish(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 
 int mqtt_handle_connack(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 {
-	if(m == NULL) {
+	if(m == NULL || rx == NULL || rx_len == 0) {
 		return MQTT_ERR_ARG; // Invalid MQTT control block
 	}
 	mqtt_connack_view_t view;
@@ -57,7 +60,7 @@ int mqtt_handle_connack(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 }
 int mqtt_handle_suback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 {
-	if(m == NULL) {
+	if(m == NULL || rx == NULL || rx_len == 0) {
 		return MQTT_ERR_ARG; // Invalid MQTT control block
 	}
 	mqtt_suback_view_t view;
@@ -78,10 +81,38 @@ int mqtt_handle_suback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 }
 int mqtt_handle_pingresp(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 {
-
+	if(m == NULL || rx == NULL) {
+		return MQTT_ERR_ARG; // Invalid MQTT control block
+	}
+	if(rx_len < 2) {
+		return MQTT_ERR_INCOMPLETE; // 包不完整，PINGRESP最短是2字节
+	}
+	uint8_t state;
+	int res = mqtt_parse_pingresp(rx, rx_len, &state);
+	if(res < 0) {
+		return res; // 解析失败
+	}
+	if(m->on_pingresp) {
+		m->on_pingresp(m->user_ctx, state);
+	}
+	return MQTT_RX_PINGRESP; // 处理了 PINGRESP 包
 }
 int mqtt_handle_puback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 {
-
+	if(m == NULL || rx == NULL) {
+		return MQTT_ERR_ARG; // Invalid MQTT control block
+	}
+	if(rx_len < 2) {
+		return MQTT_ERR_INCOMPLETE; // 包不完整，PUBACK最短是4字节
+	}
+	mqtt_puback_view_t view;
+	int res = mqtt_parse_puback_view(rx, rx_len, &view);
+	if(res < 0) {
+		return res; // 解析失败
+	}
+	if(m->on_puback) {
+		m->on_puback(m->user_ctx, &view);
+	}
+	return MQTT_RX_PUBACK; // 处理了 PUBACK 包
 }
 

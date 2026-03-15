@@ -105,6 +105,10 @@ typedef struct {
 } mqtt_publish_view_t;
 
 typedef struct {
+    uint16_t packet_id;
+} mqtt_puback_view_t;
+
+typedef struct {
     uint8_t session_present;
     uint8_t return_code;   // 0=accepted
 } mqtt_connack_view_t;
@@ -122,6 +126,8 @@ typedef void (*mqtt_on_message_cb)(void* user_ctx, const mqtt_publish_view_t* ms
 typedef void (*mqtt_on_send_cb)(void* user_ctx, const uint8_t* data, uint16_t len);
 typedef void (*mqtt_on_connack_cb)(void* user_ctx, const mqtt_connack_view_t* v);
 typedef void (*mqtt_on_suback_cb)(void* user_ctx, const mqtt_suback_view_t* v);
+typedef void (*mqtt_on_pingresp_cb)(void* user_ctx, uint8_t state);
+typedef void (*mqtt_on_puback_cb)(void* user_ctx, const mqtt_puback_view_t* v);
 
 typedef struct{
 	uint8_t  rx_buf[MQTT_RXBUF_SIZE];		//接收缓冲区		这是用在input函数里面处理服务器发来信息的接受缓冲
@@ -137,8 +143,11 @@ typedef struct{
 	mqtt_on_send_cb on_send;					//发送回调函数指针
 	mqtt_on_connack_cb on_connack;			//连接确认回调函数指针
 	mqtt_on_suback_cb on_suback;			//订阅确认回调函数指针
+	mqtt_on_pingresp_cb on_pingresp;		//PINGRESP回调函数指针
+	mqtt_on_puback_cb on_puback;			//PUBACK回调函数指针
+
 	void* user_ctx;						//用户上下文指针，在回调函数中传递给用户使用
-	uint16_t last_event_code;					//上次接收事件的事件代码，主要用于调试，被使用在input函数里面
+	int last_event_code;					//上次接收事件的事件代码，主要用于调试，被使用在input函数里面
 	uint16_t last_subscribe_pid;
     uint8_t connack_rc;          // 最近一次 CONNACK return code//用于调试
     uint8_t session_present;	// 最近一次 CONNACK session present 标志//用于调试

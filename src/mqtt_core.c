@@ -163,6 +163,24 @@ void MQTT_SetOnSuback(MQTT_TCB* m, mqtt_on_suback_cb cb, void* user_ctx)
 	m->user_ctx = user_ctx;
 }
 
+void MQTT_SetOnPingresp(MQTT_TCB* m, mqtt_on_pingresp_cb cb, void* user_ctx)
+{
+	if(!cb || !m) {
+		return; // Invalid callback
+	}
+	m->on_pingresp = cb;
+	m->user_ctx = user_ctx;
+}
+
+void MQTT_SetOnPuback(MQTT_TCB* m, mqtt_on_puback_cb cb, void* user_ctx)
+{
+	if(!cb || !m) {
+		return; // Invalid callback
+	}
+	m->on_puback = cb;
+	m->user_ctx = user_ctx;
+}
+
 void mqtt_emit_send(MQTT_TCB* m)
 {
     if (m->on_send && m->length.Totallength > 0) {

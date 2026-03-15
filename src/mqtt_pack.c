@@ -354,5 +354,10 @@ void mqtt_pack_puback(MQTT_TCB* m, uint16_t messageid)
 	m->length.Totallength = 4;
 }
 
-uint8_t mqtt_ping_req[2] = {0xC0, 0x00}; // PINGREQ 固定报头，剩余长度为0
-uint16_t mqtt_ping_req_len = 2;
+void mqtt_pack_pingreq(MQTT_TCB* m)
+{
+	m->buff[0] = 0xC0; // PINGREQ 固定报头
+	m->buff[1] = 0x00; // 剩余长度为0
+	m->length.Totallength = 2;
+}
+

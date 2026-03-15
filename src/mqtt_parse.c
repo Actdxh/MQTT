@@ -114,7 +114,7 @@ int mqtt_parse_suback_view(const uint8_t* rx, uint32_t rx_len, mqtt_suback_view_
     uint32_t idx = 1 + rem_len_bytes; // 可变报头的起始位置
     uint16_t pid = (uint16_t)(rx[idx] << 8 | rx[idx + 1]);// 报文标识符
     idx += 2; // 返回码的起始位置
-    uint32_t rc_len32 = rem_len - idx; // 返回码的长度
+    uint32_t rc_len32 = packet_len - idx; // 返回码的长度
     if(rc_len32 == 0 || rc_len32 > 255) {
         return MQTT_ERR_MALFORMED; // 返回码的长度必须至少是1，最多是255
     }
@@ -124,4 +124,55 @@ int mqtt_parse_suback_view(const uint8_t* rx, uint32_t rx_len, mqtt_suback_view_
     view->return_codes_len = (uint8_t)rc_len32;
     view->packet_len = packet_len;
     return 0; // Success    
+}
+
+int mqtt_parse_puback_view(const uint8_t* rx, uint32_t rx_len, mqtt_puback_view_t* view)
+{
+	if(rx == NULL || view == NULL) {
+		return MQTT_ERR_ARG; // 参数错误
+	}
+	if(rx_len < 4) {
+		return MQTT_ERR_INCOMPLETE; // 包不完整，PUBACK必须是4字节
+	}
+	uint32_t rem_len = 0;
+	uint8_t rem_len_bytes = 0;
+	int res = mqtt_read_rem_len(rx + 1, rx_len - 1, &rem_len, &rem_len_bytes);
+	if(res == -2) {
+		return MQTT_ERR_INCOMPLETE; // 包不完整
+	} else if(res < 0) {
+		return MQTT_ERR_MALFORMED; // Error reading remaining length
+	}
+	if(rx[0] != 0x40) {
+		return MQTT_ERR_MALFORMED; // Not a PUBACK packet，参数错误
+	}
+	if(rem_len != 0x02 || rem_len_bytes != 1) {
+		return MQTT_ERR_MALFORMED; // PUBACK剩余长度必须是2
+	}
+	memset(view, 0, sizeof(*view));
+	uint8_t idx = 1 + rem_len_bytes; // 报文标识符的起始位置
+	view->packet_id = (uint16_t)(rx[idx] << 8 | rx[idx + 1]);
+	return 0;
+}
+int mqtt_parse_pingresp(const uint8_t* rx, uint32_t rx_len, uint8_t* state)
+{
+	if(rx == NULL || state == NULL) {
+		return MQTT_ERR_ARG; // 参数错误
+	}
+	if(rx_len < 2) {
+		return MQTT_ERR_INCOMPLETE; // 包不完整，PINGRESP必须是2字节
+	}
+	uint32_t rem_len = 0;
+	uint8_t rem_len_bytes = 0;
+	int res = mqtt_read_rem_len(rx + 1, rx_len - 1, &rem_len, &rem_len_bytes);
+	if(res == -2) {
+		return MQTT_ERR_INCOMPLETE; // 包不完整
+	} else if(res < 0) {
+		return MQTT_ERR_MALFORMED; // Error reading remaining length
+	}
+	if(rx[0] != 0xD0 || rem_len != 0 || rem_len_bytes != 1) {
+		*state = 0; // 标记pingresp is invalid
+		return MQTT_ERR_MALFORMED; // PINGRESP包格式错误
+	}
+	*state = 1; // 标记为服务器在线
+	return 0; // Success
 }
