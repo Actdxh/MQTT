@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include "mqtt_parse.h"
-
+#include "mqtt_pack.h"
 
 #define PARA_SIZE 64
 #define BUFF_SIZE 256
@@ -18,6 +18,11 @@ typedef enum {
     MQTT_CONN_DISCONNECTED = 0,
     MQTT_CONN_CONNECTED = 1,
 } mqtt_conn_state_t;
+
+typedef enum {
+    MQTT_SUBSCRIBED_NONE = 0,
+    MQTT_SUBSCRIBED_ONE = 1,
+} mqtt_subscribed_state_t;
 
 typedef enum {
     MQTT_RX_UNHANDLED = 0,
@@ -71,7 +76,7 @@ typedef struct{
 	char CleanSession;						//连接会话清除标志，1清除，0不清除
 }MQTT_config_t;
 
-typedef struct mqtt_publish_params_t {
+typedef struct{
     const char* topic;
     const void* payload;
     uint16_t payload_len;
@@ -81,12 +86,17 @@ typedef struct mqtt_publish_params_t {
     uint8_t dup;     // 0/1
 }mqtt_publish_params_t;
 
+typedef struct {
+    volatile mqtt_conn_state_t connected;
+    volatile mqtt_subscribed_state_t subscribed;
+} app_ctx_t;
+
 typedef void (*mqtt_on_message_cb)(void* user_ctx, const mqtt_publish_view_t* msg);
 typedef void (*mqtt_on_send_cb)(void* user_ctx, const uint8_t* data, uint16_t len);
 typedef void (*mqtt_on_connack_cb)(void* user_ctx, const mqtt_connack_view_t* v);
 typedef void (*mqtt_on_suback_cb)(void* user_ctx, const mqtt_suback_view_t* v);
 
-typedef struct MQTT_TCB {
+typedef struct{
 	uint8_t  rx_buf[MQTT_RXBUF_SIZE];		//接收缓冲区		这是用在input函数里面处理服务器发来信息的接受缓冲
 	uint16_t rx_buf_len;					//接收缓冲区长度	这是用在input函数里面处理服务器发来信息的接受缓冲
 
@@ -100,10 +110,9 @@ typedef struct MQTT_TCB {
 	mqtt_on_send_cb on_send;					//发送回调函数指针
 	mqtt_on_connack_cb on_connack;			//连接确认回调函数指针
 	mqtt_on_suback_cb on_suback;			//订阅确认回调函数指针
-	void* user_ctx;						//用户上下文指针，在回调函数中传递给用户使用
+	app_ctx_t* user_ctx;						//用户上下文指针，在回调函数中传递给用户使用
 	uint16_t last_event_code;					//上次接收事件的事件代码，主要用于调试，被使用在input函数里面
 	uint16_t last_subscribe_pid;
-	mqtt_conn_state_t conn_state;
     uint8_t connack_rc;          // 最近一次 CONNACK return code//用于调试
     uint8_t session_present;	// 最近一次 CONNACK session present 标志//用于调试
 }MQTT_TCB;

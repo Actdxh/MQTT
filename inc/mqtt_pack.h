@@ -1,9 +1,7 @@
 #ifndef __MQTT_PACK_H
 #define __MQTT_PACK_H
 #include <stdint.h>
-
-typedef struct MQTT_TCB MQTT_TCB;
-typedef struct mqtt_publish_params_t mqtt_publish_params_t;
+#include "MQTT.h"
 
 int mqtt_pack_connect(MQTT_TCB*m, uint8_t* out, uint16_t out_size, uint16_t keepalive);
 int mqtt_pack_subscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const char * topic, char qos);

@@ -47,5 +47,6 @@ void my_on_send(void* user_ctx, const uint8_t* data, uint16_t len)
 
 void my_on_suback(void* user_ctx, const mqtt_suback_view_t* v)
 {
+	
 
 }
