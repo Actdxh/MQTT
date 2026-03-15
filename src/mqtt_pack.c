@@ -311,7 +311,8 @@ int mqtt_pack_publish(
 	}
 	if(qos > 0) {
 		out[p++] = m->MessageID/256;								//报文标识符高位 
-		out[p++] = m->MessageID%256;								//报文标识符低位 
+		out[p++] = m->MessageID%256;								//报文标识符低位
+		m->last_publish_pid = m->MessageID;
 		m->MessageID++;
 		if(m->MessageID == 0)
 		{

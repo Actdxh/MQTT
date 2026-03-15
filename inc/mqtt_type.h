@@ -87,6 +87,8 @@ typedef struct{
 typedef struct {
     volatile mqtt_conn_state_t connected;
     volatile mqtt_subscribed_state_t subscribed;
+    volatile uint8_t pingresp_seen;
+    volatile uint16_t puback_pid;//0是无效值
 } app_ctx_t;
 
 typedef struct {
@@ -133,7 +135,7 @@ typedef struct{
 	uint8_t  rx_buf[MQTT_RXBUF_SIZE];		//接收缓冲区		这是用在input函数里面处理服务器发来信息的接受缓冲
 	uint16_t rx_buf_len;					//接收缓冲区长度	这是用在input函数里面处理服务器发来信息的接受缓冲
 
-	uint32_t MessageID;						//报文标识符 
+	uint16_t MessageID;						//报文标识符 
 	MQTT_length_t length;				    //长度结构体
 	uint8_t buff[BUFF_SIZE];			//数据缓冲区 
 	MQTT_config_t	param;					//参数结构体
@@ -149,6 +151,7 @@ typedef struct{
 	void* user_ctx;						//用户上下文指针，在回调函数中传递给用户使用
 	int last_event_code;					//上次接收事件的事件代码，主要用于调试，被使用在input函数里面
 	uint16_t last_subscribe_pid;
+    uint16_t last_publish_pid;
     uint8_t connack_rc;          // 最近一次 CONNACK return code//用于调试
     uint8_t session_present;	// 最近一次 CONNACK session present 标志//用于调试
 }MQTT_TCB;

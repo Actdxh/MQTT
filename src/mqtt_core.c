@@ -194,3 +194,4 @@ void mqtt_emit_message(MQTT_TCB* m, const mqtt_publish_view_t* view)
         m->on_message(m->user_ctx, view);
     }
 }
+

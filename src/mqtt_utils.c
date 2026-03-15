@@ -2,6 +2,8 @@
 #include "string.h"
 #include "stdio.h"
 
+
+//目前够用但是无法处理非法字符/长度
 int Str_to_Hex(char* indata, uint8_t* outdata)
 {
 	int num = 0;

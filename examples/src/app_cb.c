@@ -2,26 +2,10 @@
 #include <stdio.h>
 
 
-void my_on_connack(void* user_ctx, const mqtt_connack_view_t* v)
-{
-	//空，后续补充
-	//需要注意的是这个回调是在return之前，所以就算是错的也要考虑
-
-	if(v == NULL) {
-		return; // 无效的 CONNACK 视图
-	}
-	app_ctx_t* ctx = (app_ctx_t*)user_ctx;
-	if (v->return_code == 0) {
-		ctx->connected = MQTT_CONN_CONNECTED;
-	} else {
-		ctx->connected = MQTT_CONN_DISCONNECTED;
-	}
-}
-
 void my_on_message(void* user_ctx, const mqtt_publish_view_t* msg)
 {
 	if(!msg) {
-		return; // 无效的用户上下文或消息视图
+		return; // 无效的消息视图
 	}
 	uint32_t i;
 	printf("Received message:\n");
@@ -47,7 +31,8 @@ void my_on_message(void* user_ctx, const mqtt_publish_view_t* msg)
 
 void my_on_send(void* user_ctx, const uint8_t* data, uint16_t len)
 {
-	if(!user_ctx || !data || len == 0) {
+	//不判断user_ctx因为这是作为一个可选字段，以后业务层的时候自定义其他作用
+	if(!data || len == 0) {
 		return; // 无效的用户上下文
 	}
 	uint16_t i; 
@@ -60,6 +45,21 @@ void my_on_send(void* user_ctx, const uint8_t* data, uint16_t len)
     printf("\r\n");
 };
 
+void my_on_connack(void* user_ctx, const mqtt_connack_view_t* v)
+{
+	//空，后续补充
+	//需要注意的是这个回调是在return之前，所以就算是错的也要考虑
+	if(!user_ctx || !v) {
+		return; // 无效的 CONNACK 视图
+	}
+	app_ctx_t* ctx = (app_ctx_t*)user_ctx;
+	if (v->return_code == 0) {
+		ctx->connected = MQTT_CONN_CONNECTED;
+	} else {
+		ctx->connected = MQTT_CONN_DISCONNECTED;
+	}
+}
+
 void my_on_suback(void* user_ctx, const mqtt_suback_view_t* v)
 {
 	if(!user_ctx || !v) {
@@ -69,7 +69,13 @@ void my_on_suback(void* user_ctx, const mqtt_suback_view_t* v)
 		return; // SUBACK 中没有返回码，无法处理
 	}
 	app_ctx_t* ctx = (app_ctx_t*)user_ctx;
-	ctx->subscribed = MQTT_SUBSCRIBED_ONE; // 标记为已订阅
+	if(v->return_codes[0] == 0x00 || v->return_codes[0] == 0x01 || v->return_codes[0] == 0x02) {
+		ctx->subscribed = MQTT_SUBSCRIBED_ONE; // 标记为已订阅
+	} else if(v->return_codes[0] == 0x80) {
+		ctx->subscribed = MQTT_SUBSCRIBED_NONE; // 订阅失败
+	}else {
+		ctx->subscribed = MQTT_SUBSCRIBED_NONE; // 其他返回码也视为订阅失败
+	}
 }
 
 void my_on_pingresp(void* user_ctx)
@@ -77,7 +83,8 @@ void my_on_pingresp(void* user_ctx)
 	if(!user_ctx) {
 		return; // 无效的用户上下文
 	}
-	(void)user_ctx;
+	app_ctx_t* ctx = (app_ctx_t*)user_ctx;
+	ctx->pingresp_seen = 1; // 标记已收到 PINGRESP
 	//当进入这个回调的时候就代表服务器收到了ping,可以摘这里写某个值等于当前的tick，例如stm32的get_tick
 	//然后再业务层就可以开一个定时器或者看门狗来根据这个值判断是否需要重启或者重启连接
 	//只有当业务层检测到timeout的时候才进行其他操作
@@ -90,5 +97,6 @@ void my_on_puback(void* user_ctx, const mqtt_puback_view_t* v)
 	if(!user_ctx || !v) {
 		return; // 无效的用户上下文或 PUBACK 视图
 	}
-	printf("Received PUBACK for Packet ID: %d\n", v->packet_id);
+	app_ctx_t* ctx = (app_ctx_t*)user_ctx;
+	ctx->puback_pid = v->packet_id; // 记录收到的 PUBACK 的
 }

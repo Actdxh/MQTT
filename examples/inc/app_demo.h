@@ -30,5 +30,7 @@ int app_demo_ping(MQTT_TCB* m);
 int app_demo_pingresp(MQTT_TCB* m);
 int app_demo_parse_puback(MQTT_TCB* m);
 
+/*---------------------HELPERS-------------------------*/
+int feed_data(MQTT_TCB* m, const char* hex_str);
 
 #endif // __APP_DEMO_H
