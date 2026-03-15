@@ -112,9 +112,8 @@ int MQTT_InputBytes(MQTT_TCB* m, const uint8_t* data, uint32_t len)
 		}
 		// 处理完整的 MQTT 包
 		res = MQTT_OnRx(m, m->rx_buf, frame_len);
-		m->last_event_code = res;
 		#ifdef MQTT_DEBUG
-		printf("OnRx: %s (%d)\n", MQTT_RxEventStr(res), res);
+		printf("OnRx:return :%d\n", res);
 		#endif
 		// 移除已处理的包
 		if(frame_len == m->rx_buf_len) {
@@ -129,50 +128,5 @@ int MQTT_InputBytes(MQTT_TCB* m, const uint8_t* data, uint32_t len)
 	return frames; // 返回处理的帧数
 }
 
-void MQTT_SetOnConnack(MQTT_TCB* m, mqtt_on_connack_cb cb, void* user_ctx)
-{
-	m->on_connack = cb;
-	m->user_ctx = user_ctx;
-}
 
-
-void MQTT_SetOnMessage(MQTT_TCB* m, mqtt_on_message_cb cb, void* user_ctx)
-{
-	if((cb == NULL) || (m == NULL)){
-		return; // Invalid callback
-	}
-	m->on_message = cb;
-	m->user_ctx = user_ctx;
-}
-
-void MQTT_SetOnSend(MQTT_TCB* m, mqtt_on_send_cb cb, void* user_ctx)
-{
-	if((cb == NULL) || (m == NULL)) {
-		return; // Invalid callback
-	}
-	m->on_send = cb;
-	m->user_ctx = user_ctx;
-}
-void MQTT_SetOnSuback(MQTT_TCB* m, mqtt_on_suback_cb cb, void* user_ctx)
-{
-	if(!cb || !m) {
-		return; // Invalid callback
-	}
-	m->on_suback = cb;
-	m->user_ctx = user_ctx;
-}
-
-void mqtt_emit_send(MQTT_TCB* m)
-{
-    if (m->on_send && m->length.Totallength > 0) {
-        m->on_send(m->user_ctx, m->buff, (uint16_t)m->length.Totallength);
-    }
-}
-
-void mqtt_emit_message(MQTT_TCB* m, const mqtt_publish_view_t* view)
-{
-    if (m->on_message) {
-        m->on_message(m->user_ctx, view);
-    }
-}
 

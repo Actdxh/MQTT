@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include "MQTT.h"
+#include "mqtt_type.h"
 #include "mqtt_pack.h"
 #include "mqtt_utils.h"
 #include "mqtt_parse.h"
@@ -342,4 +342,14 @@ int mqtt_pack_publish_two(MQTT_TCB* m,uint8_t* out,uint16_t out_size, mqtt_publi
 		return -1; // Invalid input
 	}
 	return mqtt_pack_publish(m, out, out_size, params->topic, params->payload, params->payload_len, params->qos, params->retain, params->dup);
+}
+
+void mqtt_pack_puback(MQTT_TCB* m, uint16_t messageid)
+{
+	m->buff[0] = 0x40;
+	m->buff[1] = 0x02;
+	m->buff[2] = messageid/256;
+	m->buff[3] = messageid%256;
+	
+	m->length.Totallength = 4;
 }

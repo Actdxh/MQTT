@@ -1,6 +1,6 @@
 #include "mqtt_utils.h"
 #include "mqtt_parse.h"
-#include "mqtt.h"
+#include "mqtt_type.h"
 #include "string.h" 
 
 int mqtt_parse_publish_view(const uint8_t* rx, uint32_t rx_len, mqtt_publish_view_t* view)

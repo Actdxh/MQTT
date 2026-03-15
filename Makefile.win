@@ -4,8 +4,8 @@
 CPP      = g++.exe
 CC       = gcc.exe
 WINDRES  = windres.exe
-OBJ      = examples/src/main.o src/mqtt_core.o src/mqtt_handlers.o src/mqtt_pack.o src/mqtt_parse.o src/mqtt_utils.o examples/src/app_cb.o examples/src/app_debug.o examples/src/app_demo.o
-LINKOBJ  = examples/src/main.o src/mqtt_core.o src/mqtt_handlers.o src/mqtt_pack.o src/mqtt_parse.o src/mqtt_utils.o examples/src/app_cb.o examples/src/app_debug.o examples/src/app_demo.o
+OBJ      = examples/src/main.o src/mqtt_core.o src/mqtt_handlers.o src/mqtt_pack.o src/mqtt_parse.o src/mqtt_utils.o examples/src/app_cb.o examples/src/app_debug.o examples/src/app_demo.o src/mqtt_function.o
+LINKOBJ  = examples/src/main.o src/mqtt_core.o src/mqtt_handlers.o src/mqtt_pack.o src/mqtt_parse.o src/mqtt_utils.o examples/src/app_cb.o examples/src/app_debug.o examples/src/app_demo.o src/mqtt_function.o
 LIBS     = -L"E:/APPWORK/Dev-Cpp/MinGW64/lib" -L"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/lib" -static-libgcc -L"H:/GITHUB/MQTT/inc" -L"H:/GITHUB/MQTT/src" -L"H:/GITHUB/MQTT/examples/inc" -L"H:/GITHUB/MQTT/examples/src"
 INCS     = -I"E:/APPWORK/Dev-Cpp/MinGW64/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"H:/GITHUB/MQTT/inc" -I"H:/GITHUB/MQTT/examples/inc" -I"H:/GITHUB/MQTT/examples/src" -I"H:/GITHUB/MQTT/src"
 CXXINCS  = -I"E:/APPWORK/Dev-Cpp/MinGW64/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include/c++" -I"H:/GITHUB/MQTT/inc" -I"H:/GITHUB/MQTT/examples/inc" -I"H:/GITHUB/MQTT/examples/src" -I"H:/GITHUB/MQTT/src"
@@ -50,3 +50,6 @@ examples/src/app_debug.o: examples/src/app_debug.c
 
 examples/src/app_demo.o: examples/src/app_demo.c
 	$(CC) -c examples/src/app_demo.c -o examples/src/app_demo.o $(CFLAGS)
+
+src/mqtt_function.o: src/mqtt_function.c
+	$(CC) -c src/mqtt_function.c -o src/mqtt_function.o $(CFLAGS)

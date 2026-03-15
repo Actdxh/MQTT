@@ -3,7 +3,7 @@
 #include "mqtt_parse.h"
 #include "mqtt_handlers.h"
 #include "mqtt_core.h"
-#include "MQTT.h"
+#include "mqtt_type.h" 
 
 
 
@@ -18,7 +18,7 @@ int mqtt_handle_publish(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 					return MQTT_RX_PUBLISH_QOS0;//处理了qos0的包
 				} else if(view.qos == 1) {
 					// QoS 1 先发送 PUBACK 再调用回调函数
-					MQTT_PUBACK(m, view.packet_id);
+					mqtt_pack_puback(m, view.packet_id);
 					mqtt_emit_send(m);
 					mqtt_emit_message(m, &view);
 					if(m->on_send) {
@@ -33,6 +33,7 @@ int mqtt_handle_publish(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 			} else {
 				return res; // 解析失败
 			}
+	return MQTT_RX_UNHANDLED; // 没有处理这个包
 }
 
 int mqtt_handle_connack(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
@@ -42,7 +43,9 @@ int mqtt_handle_connack(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 	}
 	mqtt_connack_view_t view;
 	int res = mqtt_parse_connack_view(rx, rx_len, &view);
-	
+	if(res < 0) {
+		return res; // 解析失败
+	}
 	m->connack_rc = view.return_code;
 	m->session_present = view.session_present;
 	if (view.return_code == 0) {
@@ -53,9 +56,7 @@ int mqtt_handle_connack(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 	if(m->on_connack) {
 		m->on_connack(m->user_ctx, &view);//需要注意的是这个回调是在return之前，所以就算是错的也要考虑
 	}
-	if(res < 0) {
-		return res; // 解析失败
-	}
+	
 	//这里可以考虑加回调
 	return MQTT_RX_CONNACK; // 处理了 CONNACK 包
 }
@@ -67,12 +68,12 @@ int mqtt_handle_suback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 	mqtt_suback_view_t view;
 	int res = mqtt_parse_suback_view(rx, rx_len, &view);
 	if(res < 0) {
-		return res; // 解析失败
+		return res; // 解析失败A
 	}
 	if(view.packet_id != m->last_subscribe_pid) {
 		return MQTT_ERR_PID_MISMATCH; // SUBACK 的消息 ID 不匹配
 	}
-	if(view->return_codes == NULL || view->return_codes_len == 0) {
+	if(view.return_codes == NULL || view.return_codes_len == 0) {
 		return MQTT_ERR_MALFORMED; // SUBACK 中没有返回码
 	}
 	m->user_ctx->subscribed = MQTT_SUBSCRIBED_ONE; // 标记为已订阅

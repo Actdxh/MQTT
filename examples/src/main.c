@@ -1,7 +1,10 @@
 #include <stdio.h>
-#include "MQTT.h"
 #include "app_demo.h"
 #include "main.h"
+#include"mqtt_core.h"
+#include "mqtt_pack.h"
+#include "mqtt_parse.h"
+
 
 /* run this program using the console pauser or add your own getch, system("pause") or input loop */
 
@@ -50,16 +53,16 @@ int main(int argc, char *argv[]) {
 	// MQTT_Init(&MqttB, &configB);
 
 
-	printf("MQTT Client A:\r\n");
-	connect_test(&MqttA);
-	printf("\r\n");
+	// printf("MQTT Client A:\r\n");
+	// connect_test(&MqttA);
+	// printf("\r\n");
 
 	// connect_test(&MqttB);
 	// printf("\r\n");
 
-	printf("MQTT Subscriptions:\r\n");
-	subscribe_test(&MqttA);
-	printf("\r\n");
+	// printf("MQTT Subscriptions:\r\n");
+	// subscribe_test(&MqttA);
+	// printf("\r\n");
 
 	MQTT_SetOnMessage(&MqttA, my_on_message, NULL);
 	MQTT_SetOnSend(&MqttA, my_on_send, NULL);

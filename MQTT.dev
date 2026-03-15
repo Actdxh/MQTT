@@ -61,16 +61,6 @@ OverrideBuildCmd=0
 BuildCmd=
 
 [Unit9]
-FileName=inc\mqtt_handlers.h
-CompileCpp=0
-Folder=
-Compile=1
-Link=1
-Priority=1000
-OverrideBuildCmd=0
-BuildCmd=
-
-[Unit10]
 FileName=inc\mqtt_pack.h
 CompileCpp=0
 Folder=
@@ -80,8 +70,18 @@ Priority=1000
 OverrideBuildCmd=0
 BuildCmd=
 
-[Unit11]
+[Unit10]
 FileName=inc\mqtt_parse.h
+CompileCpp=0
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit11]
+FileName=inc\mqtt_utils.h
 CompileCpp=0
 Folder=
 Compile=1
@@ -140,18 +140,8 @@ Priority=1000
 OverrideBuildCmd=0
 BuildCmd=
 
-[Unit7]
-FileName=inc\MQTT.h
-CompileCpp=0
-Folder=
-Compile=1
-Link=1
-Priority=1000
-OverrideBuildCmd=0
-BuildCmd=
-
 [Unit8]
-FileName=inc\mqtt_core.h
+FileName=inc\mqtt_handlers.h
 CompileCpp=0
 Folder=
 Compile=1
@@ -161,16 +151,6 @@ OverrideBuildCmd=0
 BuildCmd=
 
 [Unit12]
-FileName=inc\mqtt_utils.h
-CompileCpp=0
-Folder=
-Compile=1
-Link=1
-Priority=1000
-OverrideBuildCmd=0
-BuildCmd=
-
-[Unit13]
 FileName=examples\src\app_cb.c
 CompileCpp=0
 Folder=
@@ -180,7 +160,7 @@ Priority=1000
 OverrideBuildCmd=0
 BuildCmd=
 
-[Unit14]
+[Unit13]
 FileName=examples\src\app_debug.c
 CompileCpp=0
 Folder=
@@ -190,8 +170,28 @@ Priority=1000
 OverrideBuildCmd=0
 BuildCmd=
 
-[Unit15]
+[Unit14]
 FileName=examples\src\app_demo.c
+CompileCpp=0
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit15]
+FileName=inc\mqtt_type.h
+CompileCpp=0
+Folder=
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit7]
+FileName=inc\mqtt_core.h
 CompileCpp=0
 Folder=
 Compile=1
