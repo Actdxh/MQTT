@@ -41,8 +41,8 @@ int MQTT_Init(MQTT_TCB *m, const MQTT_config_t *config)
 		m->length.willdata_len = 0;
 	}
 	//m->length.topic_len = strlen(m->topic);
-	m->MessageID = 1;
-	m->rx_buf_len = 0;
+	m->ses.next_pid = 1;
+	m->io.rx_buf_len = 0;
 
 	return 0;
 }
@@ -81,7 +81,7 @@ int MQTT_InputBytes(MQTT_TCB* m, const uint8_t* data, uint32_t len)
 	if(m == NULL || data == NULL || len == 0) {
 	return -1; // Invalid input
 	}
-	if(len > sizeof(m->rx_buf)) {// 如果一次接收的数据长度超过缓冲区大小，直接丢弃并返回错误
+	if(len > sizeof(m->io.rx_buf)) {// 如果一次接收的数据长度超过缓冲区大小，直接丢弃并返回错误
 	return -1; 
 	}
 
@@ -92,44 +92,59 @@ int MQTT_InputBytes(MQTT_TCB* m, const uint8_t* data, uint32_t len)
 	uint32_t frame_len;
 
 
-	if(len > sizeof(m->rx_buf) - m->rx_buf_len) {// 检查剩余缓冲区大小是否足够不够就清空缓冲区
-		m->rx_buf_len = 0;
+	if(len > sizeof(m->io.rx_buf) - m->io.rx_buf_len) {// 检查剩余缓冲区大小是否足够不够就清空缓冲区
+		m->io.rx_buf_len = 0;
 	}
-	memcpy(m->rx_buf+m->rx_buf_len, data, len);
-	m->rx_buf_len += len;
-	while(m->rx_buf_len >= 2)
+	memcpy(m->io.rx_buf + m->io.rx_buf_len, data, len);
+	m->io.rx_buf_len += len;
+	while(m->io.rx_buf_len >= 2)
 	{
-		res = mqtt_read_rem_len(m->rx_buf + 1, m->rx_buf_len - 1, &rem_len, &rem_len_bytes);
+		res = mqtt_read_rem_len(m->io.rx_buf + 1, m->io.rx_buf_len - 1, &rem_len, &rem_len_bytes);
 		if(res == -2)
 		{
 			break; // 接收的包不完整，继续等待
 		}else if(res < 0)
 		{
-			memmove(m->rx_buf, m->rx_buf + 1, m->rx_buf_len - 1); // 移除第一个字节，继续尝试解析下一个包
-			m->rx_buf_len -= 1;
+			memmove(m->io.rx_buf, m->io.rx_buf + 1, m->io.rx_buf_len - 1); // 移除第一个字节，继续尝试解析下一个包
+			m->io.rx_buf_len -= 1;
 			continue;
 		}
 		frame_len = 1 + rem_len_bytes + rem_len;
-		if(frame_len > m->rx_buf_len) {
+		if(frame_len > m->io.rx_buf_len) {
 			break; // 接收的包不完整，继续等待
 		}
 		// 处理完整的 MQTT 包
-		res = MQTT_OnRx(m, m->rx_buf, frame_len);
-		m->last_event_code = res; // 记录上次事件代码，方便调试
+		res = MQTT_OnRx(m, m->io.rx_buf, frame_len);
+		m->ses.last_event_code = res; // 记录上次事件代码，方便调试
 		#ifdef MQTT_DEBUG
 		printf("OnRx:return :%d\n", res);
 		#endif
 		// 移除已处理的包
-		if(frame_len == m->rx_buf_len) {
-			m->rx_buf_len = 0; // 刚好处理完所有数据，直接清空缓冲区
+		if(frame_len == m->io.rx_buf_len) {
+			m->io.rx_buf_len = 0; // 刚好处理完所有数据，直接清空缓冲区
 			frames++;
-		} else if(frame_len < m->rx_buf_len) {
-			memmove(m->rx_buf, m->rx_buf + frame_len, m->rx_buf_len - frame_len);//这个函数是从buf里面往后面移一帧的数据放到前面来第三个参数要减的原因就是移动减去帧长的长度
-			m->rx_buf_len -= frame_len;
+		} else if(frame_len < m->io.rx_buf_len) {
+			memmove(m->io.rx_buf, m->io.rx_buf + frame_len, m->io.rx_buf_len - frame_len);//这个函数是从buf里面往后面移一帧的数据放到前面来第三个参数要减的原因就是移动减去帧长的长度
+			m->io.rx_buf_len -= frame_len;
 			frames++;
 		}
 	}
 	return frames; // 返回处理的帧数
+}
+
+void MQTT_SetAllOnCb_same(MQTT_TCB* m, const MQTT_Callbacks *cb)
+{
+	if(m == NULL) {
+		return; // Invalid callback
+	}
+	MQTT_SetOnConnack(m, cb->on_connack, cb->on_connack_ctx);
+	MQTT_SetOnPublish(m, cb->on_publish, cb->on_publish_ctx);
+	MQTT_SetOnSend(m, cb->on_send, cb->on_send_ctx);
+	MQTT_SetOnSuback(m, cb->on_suback, cb->on_suback_ctx);
+	MQTT_SetOnUnsuback(m, cb->on_unsuback, cb->on_unsuback_ctx);
+	MQTT_SetOnPingresp(m, cb->on_pingresp, cb->on_pingresp_ctx);
+	MQTT_SetOnPuback(m, cb->on_puback, cb->on_puback_ctx);
+	
 }
 
 
@@ -205,7 +220,7 @@ void mqtt_emit_send(MQTT_TCB* m)
 		return; // No send callback registered
 	}
     if (m->callbacks.on_send && m->length.Totallength > 0) {
-        m->callbacks.on_send(m->callbacks.on_send_ctx, m->buff, (uint16_t)m->length.Totallength);
+		m->callbacks.on_send(m->callbacks.on_send_ctx, m->io.tx_buf, (uint16_t)m->length.Totallength);
     }
 }
 

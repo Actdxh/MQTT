@@ -1,4 +1,5 @@
 #include "app_demo.h"
+#include "app_ctx.h"
 #include "mqtt_core.h"
 #include "mqtt_pack.h"
 #include "mqtt_utils.h"
@@ -37,7 +38,9 @@ int i;
 int res;
 uint8_t databuf[128];
 uint16_t datalen;
-static app_ctx_t g_demo_ctx;
+static app_evt_queue_t g_demo_ctx; // 全局应用事件队列
+static int connack_wait_guard = 0; // 用于防止死循环的简单计数器
+static int suback_wait_guard = 0; // 用于防止死循环的简单计数器
 static int pingresp_wait_guard = 0; // 用于防止死循环的简单计数器
 static int puback_wait_guard = 0; // 用于防止死循环的简单计数器
 void app_demo(void)
@@ -61,18 +64,32 @@ void app_demo(void)
                 } else {
                     st = ST_SEND_CONNECT;
                 }
-                MQTT_SetOnPublish(&MqttA, my_on_publish, &g_demo_ctx);
-	            MQTT_SetOnSend(&MqttA, my_on_send, &g_demo_ctx);
-                MQTT_SetOnConnack(&MqttA, my_on_connack, &g_demo_ctx);
-                MQTT_SetOnSuback(&MqttA, my_on_suback, &g_demo_ctx);
-                MQTT_SetOnPingresp(&MqttA, my_on_pingresp, &g_demo_ctx);
-                MQTT_SetOnPuback(&MqttA, my_on_puback, &g_demo_ctx);
+                app_ctx_init(&g_demo_ctx); // 初始化应用事件队列
+                MQTT_SetAllOnCb_same(&MqttA, &(MQTT_Callbacks){
+                    .on_connack = my_on_connack,
+                    .on_connack_ctx = &g_demo_ctx,
+                    .on_publish = my_on_publish,
+                    .on_publish_ctx = &g_demo_ctx,
+                    .on_send = my_on_send,
+                    .on_send_ctx = NULL, // 发送回调不需要用户上下文
+                    .on_suback = my_on_suback,
+                    .on_suback_ctx = &g_demo_ctx,
+                    .on_unsuback = my_on_unsuback,
+                    .on_unsuback_ctx = &g_demo_ctx,
+                    .on_pingresp = my_on_pingresp,
+                    .on_pingresp_ctx = &g_demo_ctx,
+                    .on_puback = my_on_puback,
+                    .on_puback_ctx = &g_demo_ctx,
+                }); // 注册回调函数
             }
                 break;
             case ST_SEND_CONNECT:{
-                g_demo_ctx.connected = MQTT_CONN_DISCONNECTED; // 确保连接状态被正确初始化
-                mqtt_pack_connect(&MqttA, MqttA.buff, BUFF_SIZE, 10000);
+                connack_wait_guard = 0;
+                mqtt_pack_connect(&MqttA, MqttA.io.tx_buf, BUFF_SIZE, 10000);
                 mqtt_emit_send(&MqttA);
+                #ifdef MQTT_DEMO_DEBUG
+                printf("MQTT CONNECT message sent\r\n");
+                #endif // DEBUG
                 st = ST_FEED_CONNACK;
             }
                 break;
@@ -82,25 +99,47 @@ void app_demo(void)
             }
                 break;
             case ST_WAIT_CONNACK:{
-                if(g_demo_ctx.connected == MQTT_CONN_CONNECTED) {
-                    st = ST_SEND_SUBSCRIBE; // 连接成功，进入下一步
-                } else if(g_demo_ctx.connected == MQTT_CONN_DISCONNECTED) {
+                connack_wait_guard ++;
+                if(connack_wait_guard > 100) {
                     #ifdef MQTT_DEMO_DEBUG
-                    printf("Connection failed, rc = %u\r\n", (unsigned)MqttA.connack_rc);
+                    printf("Waiting for CONNACK timeout!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 超时未收到 CONNACK，进入错误状态
+                    break;
+                }
+                app_evt_t e;
+                int res = app_evt_pop(&g_demo_ctx, &e);
+                if(res == 0) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Waiting for CONNACK...\r\n");
+                    #endif // DEBUG
+                    st = ST_WAIT_CONNACK; // 继续等待连接确认事件
+                    break;
+                }else if(res < 0) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Error while waiting for CONNACK!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 等待事件时发生错误，进入错误状态
+                    break;
+                }else if(e.type == APP_EVT_CONNACK_OK) {
+                    st = ST_SEND_SUBSCRIBE; // 连接成功，进入下一步
+                }else if(e.type == APP_EVT_CONNACK_FAIL) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Connection failed, rc = %u\r\n", (unsigned)MqttA.ses.connack_rc);
                     #endif // DEBUG
                     st = ST_ERROR; // 连接失败，进入错误状态
                 }
             }
                 break;
             case ST_SEND_SUBSCRIBE:{
-                g_demo_ctx.subscribed = MQTT_SUBSCRIBED_NONE; // 确保订阅状态被正确初始化
-                mqtt_pack_subscribe(&MqttA, MqttA.buff, BUFF_SIZE, "TOPIC001", 0);
+                suback_wait_guard = 0;
+                mqtt_pack_subscribe(&MqttA, MqttA.io.tx_buf, BUFF_SIZE, "TOPIC001", 0);
                 mqtt_emit_send(&MqttA);
                 st = ST_FEED_SUBACK;
             }
                 break;
             case ST_FEED_SUBACK:{
-                uint16_t pid = MqttA.last_subscribe_pid; // 获取刚才发送的 SUBSCRIBE 报文的 Packet ID
+                uint16_t pid = MqttA.ses.last_subscribe_pid; // 获取刚才发送的 SUBSCRIBE 报文的 Packet ID
                 uint8_t pid_high = (pid >> 8) & 0xFF;
                 uint8_t pid_low = pid & 0xFF;
                 char suback_hex[32];
@@ -110,9 +149,34 @@ void app_demo(void)
             }
                 break;
             case ST_WAIT_SUBACK:{
-                if(g_demo_ctx.subscribed == MQTT_SUBSCRIBED_ONE) {
+                suback_wait_guard++;
+                if(suback_wait_guard > 100) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Waiting for SUBACK timeout!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 超时未收到 SUBACK，进入错误状态
+                    break;
+                }
+                app_evt_t e;
+                int res = app_evt_pop(&g_demo_ctx, &e);
+                if(res == 0) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Waiting for SUBACK...\r\n");
+                    #endif // DEBUG
+                    st = ST_WAIT_SUBACK; // 继续等待订阅确认事件
+                    break;
+                }else if(res < 0) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Error while waiting for SUBACK!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 等待事件时发生错误，进入错误状态
+                    break;
+                }else if(e.type == APP_EVT_SUBACK_OK) {
                     st = ST_SEND_PUBLISH1; // 订阅成功，进入下一步
-                } else if(g_demo_ctx.subscribed == MQTT_SUBSCRIBED_NONE) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Subscription successful\r\n");
+                    #endif // DEBUG
+                } else if(e.type == APP_EVT_SUBACK_FAIL) {
                     #ifdef MQTT_DEMO_DEBUG
                     printf("Subscription failed\r\n");
                     #endif // DEBUG
@@ -122,7 +186,6 @@ void app_demo(void)
                 break;
             case ST_SEND_PUBLISH1:{
                 puback_wait_guard = 0; // 确保等待 PUBACK 的计数器被正确初始化
-                g_demo_ctx.puback_pid = 0; // 确保 PUBACK PID 被正确初始化
                 mqtt_publish_params_t params = {
                     .topic = "TEST",
                     .payload = "Hello MQTT",
@@ -131,16 +194,16 @@ void app_demo(void)
                     .retain = 0,
                     .dup = 0
                 };
-                mqtt_pack_publish_two(&MqttA, MqttA.buff, BUFF_SIZE, &params);
+                mqtt_pack_publish_two(&MqttA, MqttA.io.tx_buf, BUFF_SIZE, &params);
                 mqtt_emit_send(&MqttA);
                 #ifdef MQTT_DEMO_DEBUG
-                printf("MQTT_NEW_PID: %u\r\n", MqttA.last_publish_pid);
+                printf("MQTT_NEW_PID: %u\r\n", MqttA.ses.last_publish_pid);
                 #endif // DEBUG
                 st = ST_FEED_PUBACK1;
             }
                 break;
             case ST_FEED_PUBACK1:{
-                uint16_t pid = MqttA.last_publish_pid; // 获取刚才发送的 PUBLISH 报文的 Packet ID
+                uint16_t pid = MqttA.ses.last_publish_pid; // 获取刚才发送的 PUBLISH 报文的 Packet ID
                 uint8_t pid_high = (pid >> 8) & 0xFF;
                 uint8_t pid_low = pid & 0xFF;
                 char puback_hex[32];
@@ -153,21 +216,37 @@ void app_demo(void)
             }
                 break;
             case ST_WAIT_PUBACK:{
+                app_evt_t e;
                 puback_wait_guard++;
-                if(g_demo_ctx.puback_pid == MqttA.last_publish_pid) {
-                    #ifdef MQTT_DEMO_DEBUG
-                    printf("PUBACK received for PID: %u\r\n", g_demo_ctx.puback_pid);
-                    #endif // DEBUG
-                    st = ST_SEND_PING; // 收到 PUBACK，进入下一步
-                }else if(puback_wait_guard > 100) {
+                if(puback_wait_guard > 100) {
                     #ifdef MQTT_DEMO_DEBUG
                     printf("Waiting for PUBACK timeout!\r\n");
                     #endif // DEBUG
                     st = ST_ERROR; // 超时未收到 PUBACK，进入错误状态
-                }else{
+                    break;
+                }
+                int res = app_evt_pop(&g_demo_ctx, &e);
+                if(res == 0) {
                     #ifdef MQTT_DEMO_DEBUG
+                    printf("Waiting for PUBACK...\r\n");
+                    #endif // DEBUG
+                    st = ST_WAIT_PUBACK; // 继续等待 PUBACK 事件
+                    break;
+                }else if(res < 0){
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Error while waiting for PUBACK!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 等待事件时发生错误，进入错误状态
+                    break;
+                } else if(e.type == APP_EVT_PUBACK_OK && e.pid == MqttA.ses.last_publish_pid) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("PUBACK received for PID: %u\r\n", e.pid);
+                    #endif // DEBUG
+                    st = ST_SEND_PING; // 收到 PUBACK，进入下一步
+                }else{
+					#ifdef MQTT_DEMO_DEBUG
                     if(puback_wait_guard % 10 == 0) { // 每10次打印一次
-                        printf("PUBACK EXPERT PID: %u, RECEIVED: %u\r\n", MqttA.last_publish_pid, g_demo_ctx.puback_pid);
+                        printf("PUBACK EXPERT PID: %u, RECEIVED: %u\r\n", MqttA.ses.last_publish_pid, e.pid);
                     }
                     #endif // DEBUG
                     st = ST_WAIT_PUBACK; // 继续等待 PUBACK 事件 
@@ -176,7 +255,6 @@ void app_demo(void)
                 break;
             case ST_SEND_PING:{
                 pingresp_wait_guard = 0; // 确保等待 PINGRESP 的计数器被正确初始化
-                g_demo_ctx.pingresp_seen = 0; // 确保 PINGRESP 状态被正确初始化
                 mqtt_pack_pingreq(&MqttA);
                 mqtt_emit_send(&MqttA);
                 st = ST_FEED_PINGRESP;
@@ -189,17 +267,34 @@ void app_demo(void)
                 break;
             case ST_WAIT_PINGRESP:{
                 pingresp_wait_guard++;
-                if(g_demo_ctx.pingresp_seen) {
-                    #ifdef MQTT_DEMO_DEBUG
-                    printf("PINGRESP received!\r\n");
-                    #endif // DEBUG
-                    st = ST_DONE; // 收到 PINGRESP，流程完成
-                }else if(pingresp_wait_guard > 100) {
+                if(pingresp_wait_guard > 100) {
                     #ifdef MQTT_DEMO_DEBUG
                     printf("Waiting for PINGRESP timeout!\r\n");
                     #endif // DEBUG
                     st = ST_ERROR; // 超时未收到 PINGRESP，进入错误状态
-                }else {
+                }
+                app_evt_t e;
+                int res = app_evt_pop(&g_demo_ctx, &e);
+                if(res == 0) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Waiting for PINGRESP...\r\n");
+                    #endif // DEBUG
+                    st = ST_WAIT_PINGRESP; // 继续等待 PINGRESP 事件
+                    break;
+                }else if (res < 0)
+                {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Error while waiting for PINGRESP!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 等待事件时发生错误，进入错误状态
+                    break;
+                } else if(e.type == APP_EVT_PINGRESP) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("PINGRESP received!\r\n");
+                    #endif // DEBUG
+                    st = ST_DONE; // 收到 PINGRESP，流程完成
+                }else 
+                {
                     #ifdef MQTT_DEMO_DEBUG
                     if(pingresp_wait_guard % 10 == 0) { // 每10次打印一次
                        printf("PINGRESP not received yet!\r\n");
@@ -221,7 +316,13 @@ void app_demo(void)
     } else {
         printf("app_demo status: ERROR\r\n");
     }
+    
+}
+
+void app_demo_test(void)
+{
     //这是一个完整的示例，从初始化到连接服务器，再到订阅主题，最后发布消息，最后断开连接
+    MQTT_TCB MqttA;
     app_demo_init(&MqttA);
     app_demo_connect(&MqttA);
     app_demo_conack(&MqttA);
@@ -236,6 +337,7 @@ void app_demo(void)
     app_demo_pingresp(&MqttA);
     app_demo_disconnect(&MqttA);
 }
+
 
 int app_demo_init(MQTT_TCB* m)
 {
@@ -285,7 +387,7 @@ int app_demo_connect(MQTT_TCB* m)
     printf("--------------------------------------------------------------\r\n");
     printf("--------------------------------------------------------------\r\n");
     printf("MQTT Client A Connect:\r\n");
-	res = mqtt_pack_connect(m, m->buff,BUFF_SIZE, 10000);
+    res = mqtt_pack_connect(m, m->io.tx_buf, BUFF_SIZE, 10000);
     if(res < 0) {
         #ifdef MQTT_DEMO_DEBUG
         printf("Failed to pack MQTT CONNECT message res: %d\r\n", res);
@@ -296,7 +398,7 @@ int app_demo_connect(MQTT_TCB* m)
         printf("MQTT CONNECT message packed successfully, length: %d\r\n", res);
         for(i = 0; i < m->length.Totallength; i++)
         {
-            printf("%02x ",m->buff[i]);
+            printf("%02x ", m->io.tx_buf[i]);
         }
         printf("\r\n");
         #endif // DEBUG
@@ -320,7 +422,7 @@ int app_demo_conack(MQTT_TCB* m)
         printf("CONNACK message processed successfully\r\n");
     }
 	printf("MQTT_InputBytes result=%d\n", res);
-	printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->last_event_code), m->last_event_code);
+    printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->ses.last_event_code), m->ses.last_event_code);
     #endif // DEBUG
     return res;
 }
@@ -330,7 +432,7 @@ int app_demo_subscribe(MQTT_TCB* m)
     //这是一个订阅主题的示例，展示了如何使用 MQTT_pack_subscribe 函数来构建订阅报文，并通过回调函数处理服务器的响应
     printf("--------------------------------------------------------------\r\n");
     printf("--------------------------------------------------------------\r\n");
-    res = mqtt_pack_subscribe(m, m->buff, BUFF_SIZE, "TEST", 1);
+    res = mqtt_pack_subscribe(m, m->io.tx_buf, BUFF_SIZE, "TEST", 1);
     if(res < 0) {
         #ifdef MQTT_DEMO_DEBUG
         printf("Failed to pack MQTT SUBSCRIBE message res: %d\r\n", res);
@@ -341,7 +443,7 @@ int app_demo_subscribe(MQTT_TCB* m)
         printf("MQTT SUBSCRIBE message packed successfully, length: %d\r\n", res);
         for(i = 0; i < m->length.Totallength; i++)
         {
-            printf("%02x ",m->buff[i]);
+            printf("%02x ", m->io.tx_buf[i]);
         }
         printf("\r\n");
         #endif // DEBUG
@@ -366,7 +468,7 @@ int app_demo_suback(MQTT_TCB* m)
         printf("SUBACK message processed successfully\r\n");
     }
     printf("MQTT_InputBytes result=%d\n", res);
-    printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->last_event_code), m->last_event_code);
+    printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->ses.last_event_code), m->ses.last_event_code);
     #endif // DEBUG
     return res;
 }
@@ -376,7 +478,7 @@ int app_demo_unsubscribe(MQTT_TCB* m)
     printf("--------------------------------------------------------------\r\n");
     printf("--------------------------------------------------------------\r\n");
     //这是一个取消订阅的示例，展示了如何使用 MQTT_pack_unsubscribe 函数来构建取消订阅报文
-    res = mqtt_pack_unsubscribe(m, m->buff, BUFF_SIZE, "TEST");
+    res = mqtt_pack_unsubscribe(m, m->io.tx_buf, BUFF_SIZE, "TEST");
     if(res < 0) {
         #ifdef MQTT_DEMO_DEBUG
         printf("Failed to pack MQTT UNSUBSCRIBE message res: %d\r\n", res);
@@ -387,7 +489,7 @@ int app_demo_unsubscribe(MQTT_TCB* m)
         printf("MQTT UNSUBSCRIBE message packed successfully, length: %d\r\n", res);
         for(i = 0; i < m->length.Totallength; i++)
         {
-            printf("%02x ",m->buff[i]);
+            printf("%02x ", m->io.tx_buf[i]);
         }
         printf("\r\n");
         #endif // DEBUG
@@ -408,7 +510,7 @@ int app_demo_publish(MQTT_TCB* m)
                     .retain = 0,
                     .dup = 0
                 };
-    res = mqtt_pack_publish_two(m, m->buff, BUFF_SIZE, &params);
+    res = mqtt_pack_publish_two(m, m->io.tx_buf, BUFF_SIZE, &params);
     if(res < 0) {
         #ifdef MQTT_DEMO_DEBUG
         printf("Failed to pack MQTT PUBLISH message res: %d\r\n", res);
@@ -419,7 +521,7 @@ int app_demo_publish(MQTT_TCB* m)
         printf("MQTT PUBLISH message packed successfully, length: %d\r\n", res);
         for(i = 0; i < m->length.Totallength; i++)
         {
-            printf("%02x ",m->buff[i]);
+            printf("%02x ", m->io.tx_buf[i]);
         }
         printf("\r\n");
         #endif // DEBUG
@@ -435,7 +537,7 @@ int app_demo_pack_puback_myself(MQTT_TCB* m)
     #ifdef MQTT_DEMO_DEBUG
     printf("Start parse myself publish message:\r\n");
     #endif // DEBUG
-	res = MQTT_InputBytes(m, (const uint8_t*)m->buff, m->length.Totallength);
+    res = MQTT_InputBytes(m, m->io.tx_buf, m->length.Totallength);
     #ifdef MQTT_DEMO_DEBUG
     if(res < 0) {
         printf("Failed to parse myself PUBLISH message res: %d\r\n", res);
@@ -443,7 +545,7 @@ int app_demo_pack_puback_myself(MQTT_TCB* m)
         printf("Myself PUBLISH message parsed successfully\r\n");
     }
 	printf("MQTT_InputBytes result=%d\n", res);
-	printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->last_event_code), m->last_event_code);
+    printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->ses.last_event_code), m->ses.last_event_code);
     #endif // DEBUG
     return res;
 }
@@ -466,7 +568,7 @@ int app_demo_pack_puback(MQTT_TCB* m)
         printf("PUBLISH message parsed successfully\r\n");
     }
 	printf("MQTT_InputBytes result=%d\n", res);
-	printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->last_event_code), m->last_event_code);
+    printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->ses.last_event_code), m->ses.last_event_code);
     #endif // DEBUG
 	res = MQTT_InputBytes(m, (const uint8_t*)(hex_buff + 3), (uint16_t)(hex_len - 3));
     #ifdef MQTT_DEMO_DEBUG
@@ -476,7 +578,7 @@ int app_demo_pack_puback(MQTT_TCB* m)
         printf("PUBLISH message parsed successfully\r\n");
     }
 	printf("MQTT_InputBytes result=%d\n", res);
-	printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->last_event_code), m->last_event_code);
+    printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->ses.last_event_code), m->ses.last_event_code);
     #endif // DEBUG
     return res;
 }
@@ -498,7 +600,7 @@ int app_demo_ping(MQTT_TCB* m)
     printf("MQTT PINGREQ message packed successfully!\r\n");
     for(i = 0; i < m->length.Totallength; i++)
     {
-        printf("%02x ",m->buff[i]);
+        printf("%02x ", m->io.tx_buf[i]);
     }
     printf("\r\n");
     #endif // DEBUG
@@ -520,7 +622,7 @@ int app_demo_pingresp(MQTT_TCB* m)
         printf("MQTT PINGRESP message parsed successfully!\r\n");
     }
     printf("MQTT_InputBytes result=%d\n", res);
-    printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->last_event_code), m->last_event_code);
+    printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->ses.last_event_code), m->ses.last_event_code);
     #endif // DEBUG
     return res;
 }
@@ -530,7 +632,7 @@ int app_demo_parse_puback(MQTT_TCB* m)
     printf("--------------------------------------------------------------\r\n");
     printf("--------------------------------------------------------------\r\n");
     mqtt_pack_puback(m, 1);
-    res = MQTT_InputBytes(m, (const uint8_t*)m->buff, (uint16_t)m->length.Totallength);
+    res = MQTT_InputBytes(m, m->io.tx_buf, (uint16_t)m->length.Totallength);
     #ifdef MQTT_DEMO_DEBUG
     if(res < 0)
     {
@@ -541,7 +643,7 @@ int app_demo_parse_puback(MQTT_TCB* m)
         printf("MQTT PUBACK message parsed successfully!\r\n");
     }
     printf("MQTT_InputBytes result=%d\n", res);
-    printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->last_event_code), m->last_event_code);
+    printf("OnRx: %s (%d)\n", MQTT_RxEventStr(m->ses.last_event_code), m->ses.last_event_code);
     #endif // DEBUG
     return res;
 }
@@ -553,7 +655,7 @@ int feed_data(MQTT_TCB* m, const char* hex_str)
     int hex_len = Str_to_Hex((char*)hex_str, hex_buff);
     int res = MQTT_InputBytes(m, (const uint8_t*)hex_buff, (uint16_t)hex_len);
     #ifdef MQTT_DEMO_DEBUG
-    printf("data fed: %s (%d)\r\n", MQTT_RxEventStr(m->last_event_code), m->last_event_code);
+    printf("data fed: %s (%d)\r\n", MQTT_RxEventStr(m->ses.last_event_code), m->ses.last_event_code);
     #endif // DEBUG
     return res;
 }

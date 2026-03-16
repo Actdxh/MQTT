@@ -163,13 +163,13 @@ int mqtt_pack_subscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const char
 	}
 	/************************可变报头*************************/ 
 	
-	out[p++] = m->MessageID/256;								//报文标识符高位 
-	out[p++] = m->MessageID%256;								//报文标识符低位 
-	m->last_subscribe_pid = m->MessageID;
-	m->MessageID++;
-	if(m->MessageID == 0)
+	out[p++] = m->ses.next_pid / 256;								//报文标识符高位 
+	out[p++] = m->ses.next_pid % 256;								//报文标识符低位 
+	m->ses.last_subscribe_pid = m->ses.next_pid;
+	m->ses.next_pid++;
+	if(m->ses.next_pid == 0)
 	{
-		m->MessageID = 1;
+		m->ses.next_pid = 1;
 	} 
 
 	/************************有效负载*************************/ 
@@ -224,13 +224,13 @@ int mqtt_pack_unsubscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const ch
 	
 	/************************可变报头*************************/ 
 	
-	out[p++] = m->MessageID/256;								//报文标识符高位 
-	out[p++] = m->MessageID%256;								//报文标识符低位
-	m->last_unsubscribe_pid = m->MessageID;
-	m->MessageID++;
-	if(m->MessageID == 0)
+	out[p++] = m->ses.next_pid / 256;								//报文标识符高位 
+	out[p++] = m->ses.next_pid % 256;								//报文标识符低位
+	m->ses.last_unsubscribe_pid = m->ses.next_pid;
+	m->ses.next_pid++;
+	if(m->ses.next_pid == 0)
 	{
-		m->MessageID = 1;
+		m->ses.next_pid = 1;
 	}
 
 	/************************有效负载*************************/ 
@@ -311,13 +311,13 @@ int mqtt_pack_publish(
 		return -1; // Error writing topic
 	}
 	if(qos > 0) {
-		out[p++] = m->MessageID/256;								//报文标识符高位 
-		out[p++] = m->MessageID%256;								//报文标识符低位
-		m->last_publish_pid = m->MessageID;
-		m->MessageID++;
-		if(m->MessageID == 0)
+		out[p++] = m->ses.next_pid / 256;								//报文标识符高位 
+		out[p++] = m->ses.next_pid % 256;								//报文标识符低位
+		m->ses.last_publish_pid = m->ses.next_pid;
+		m->ses.next_pid++;
+		if(m->ses.next_pid == 0)
 		{
-			m->MessageID = 1;
+			m->ses.next_pid = 1;
 		}
 	} 
 	/************************有效负载*************************/ 
@@ -348,18 +348,18 @@ int mqtt_pack_publish_two(MQTT_TCB* m,uint8_t* out,uint16_t out_size, mqtt_publi
 
 void mqtt_pack_puback(MQTT_TCB* m, uint16_t messageid)
 {
-	m->buff[0] = 0x40;
-	m->buff[1] = 0x02;
-	m->buff[2] = messageid/256;
-	m->buff[3] = messageid%256;
+	m->io.tx_buf[0] = 0x40;
+	m->io.tx_buf[1] = 0x02;
+	m->io.tx_buf[2] = messageid/256;
+	m->io.tx_buf[3] = messageid%256;
 	
 	m->length.Totallength = 4;
 }
 
 void mqtt_pack_pingreq(MQTT_TCB* m)
 {
-	m->buff[0] = 0xC0; // PINGREQ 固定报头
-	m->buff[1] = 0x00; // 剩余长度为0
+	m->io.tx_buf[0] = 0xC0; // PINGREQ 固定报头
+	m->io.tx_buf[1] = 0x00; // 剩余长度为0
 	m->length.Totallength = 2;
 }
 

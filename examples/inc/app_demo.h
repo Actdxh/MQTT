@@ -17,6 +17,7 @@ void my_on_puback(void* user_ctx, const mqtt_puback_view_t* v);
 const char* MQTT_RxEventStr(int code);
 
 void app_demo(void);
+void app_demo_test(void);
 int app_demo_init(MQTT_TCB* m);
 int app_demo_connect(MQTT_TCB* m);
 int app_demo_conack(MQTT_TCB* m);

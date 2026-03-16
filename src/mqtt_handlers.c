@@ -59,12 +59,11 @@ int mqtt_handle_connack(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 	if(res < 0) {
 		return res; // 解析失败
 	}
-	m->connack_rc = view.return_code;
-	m->session_present = view.session_present;
+	m->ses.connack_rc = view.return_code;
+	m->ses.session_present = view.session_present;
 	if(m->callbacks.on_connack) {
 		m->callbacks.on_connack(m->callbacks.on_connack_ctx, &view);//需要注意的是这个回调是在return之前，所以就算是错的也要考虑
 	}
-	
 	//这里可以考虑加回调
 	return MQTT_RX_CONNACK; // 处理了 CONNACK 包
 }
@@ -81,7 +80,7 @@ int mqtt_handle_suback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 	if(res < 0) {
 		return res; // 解析失败A
 	}
-	if(view.packet_id != m->last_subscribe_pid) {
+	if(view.packet_id != m->ses.last_subscribe_pid) {
 		return MQTT_ERR_PID_MISMATCH; // SUBACK 的消息 ID 不匹配
 	}
 	if(view.return_codes == NULL || view.return_codes_len == 0) {
@@ -106,7 +105,7 @@ int mqtt_handle_unsuback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 	if(res < 0) {
 		return res; // 解析失败
 	}
-	if(view.packet_id != m->last_unsubscribe_pid) {
+	if(view.packet_id != m->ses.last_unsubscribe_pid) {
 		return MQTT_ERR_PID_MISMATCH; // UNSUBACK 的消息 ID 不匹配
 	}
 	if(m->callbacks.on_unsuback) {

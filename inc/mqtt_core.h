@@ -12,6 +12,7 @@ int MQTT_InputBytes(MQTT_TCB* m, const uint8_t* data, uint32_t len);
 int MQTT_OnRx(MQTT_TCB* m, const uint8_t* rx_data, uint32_t rx_len);
 
 /*--------------------回调函数的注册函数-------------------------*/
+void MQTT_SetAllOnCb_same(MQTT_TCB* m, const MQTT_Callbacks *cb);
 void MQTT_SetOnConnack(MQTT_TCB* m, mqtt_on_connack_cb cb, void* user_ctx);
 void MQTT_SetOnPublish(MQTT_TCB* m, mqtt_on_publish_cb cb, void* user_ctx);
 void MQTT_SetOnSend(MQTT_TCB* m, mqtt_on_send_cb cb, void* user_ctx);

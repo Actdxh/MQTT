@@ -12,6 +12,9 @@
 #define MQTT_RXBUF_SIZE 1024
 #endif
 
+
+
+
 typedef enum {
     MQTT_CONN_DISCONNECTED = 0,
     MQTT_CONN_CONNECTED = 1,
@@ -21,6 +24,13 @@ typedef enum {
     MQTT_SUBSCRIBED_NONE = 0,
     MQTT_SUBSCRIBED_ONE = 1,
 } mqtt_subscribed_state_t;
+
+typedef struct {
+    volatile mqtt_conn_state_t connected;
+    volatile mqtt_subscribed_state_t subscribed;
+    volatile uint8_t pingresp_seen;
+    volatile uint16_t puback_pid;//0是无效值
+} app_ctx_t;
 
 typedef enum {
     MQTT_RX_UNHANDLED = 0,
@@ -85,12 +95,7 @@ typedef struct{
     uint8_t dup;     // 0/1
 }mqtt_publish_params_t;
 
-typedef struct {
-    volatile mqtt_conn_state_t connected;
-    volatile mqtt_subscribed_state_t subscribed;
-    volatile uint8_t pingresp_seen;
-    volatile uint16_t puback_pid;//0是无效值
-} app_ctx_t;
+
 
 
 
@@ -138,50 +143,75 @@ typedef void (*mqtt_on_suback_cb)(void* user_ctx, const mqtt_suback_view_t* v);
 typedef void (*mqtt_on_pingresp_cb)(void* user_ctx);
 typedef void (*mqtt_on_puback_cb)(void* user_ctx, const mqtt_puback_view_t* v);
 typedef void (*mqtt_on_unsuback_cb)(void* user_ctx, const mqtt_unsuback_view_t* v);
+typedef uint32_t (*mqtt_now_ms_fn)(void* user_ctx);// 获取当前时间的函数指针，单位毫秒，返回值为当前时间的毫秒数，可以用于实现超时等功能
 
 typedef struct {
     mqtt_on_publish_cb  on_publish;
     void*               on_publish_ctx;
-
     mqtt_on_send_cb     on_send;
     void*               on_send_ctx;
-
     mqtt_on_connack_cb  on_connack;
     void*               on_connack_ctx;
-
     mqtt_on_suback_cb   on_suback;
     void*               on_suback_ctx;
-
     mqtt_on_unsuback_cb on_unsuback;
     void*               on_unsuback_ctx;
-
     mqtt_on_puback_cb   on_puback;
     void*               on_puback_ctx;
-
     mqtt_on_pingresp_cb on_pingresp;
     void*               on_pingresp_ctx;
 } MQTT_Callbacks;
 
+typedef struct 
+{
+    mqtt_now_ms_fn now_ms;
+    void* now_ms_ctx;
+} MQTT_Platform;
+
+typedef struct 
+{
+    uint8_t  rx_buf[MQTT_RXBUF_SIZE];		//接收缓冲区		这是用在input函数里面处理服务器发来信息的接受缓冲
+	uint16_t rx_buf_len;					//接收缓冲区长度	这是用在input函数里面处理服务器发来信息的接受缓冲的长度
+
+    uint8_t  tx_buf[BUFF_SIZE];		//发送缓冲区
+
+}MQTT_Buffers;
+
 typedef struct{
-	uint8_t  rx_buf[MQTT_RXBUF_SIZE];		//接收缓冲区		这是用在input函数里面处理服务器发来信息的接受缓冲
-	uint16_t rx_buf_len;					//接收缓冲区长度	这是用在input函数里面处理服务器发来信息的接受缓冲
-
-	uint16_t MessageID;						//报文标识符 
-	MQTT_length_t length;				    //长度结构体
-	uint8_t buff[BUFF_SIZE];			//数据缓冲区 
-	MQTT_config_t	param;					//参数结构体
-	char topic[TOPIC_SIZE];					//接收到服务器推送的订阅的主题缓冲区 
-	uint8_t data[DATA_SIZE];						//接收到服务推送的数据
-
-	void* user_ctx;						//用户上下文指针，在回调函数中传递给用户使用
-	int last_event_code;					//上次接收事件的事件代码，主要用于调试，被使用在input函数里面
-	uint16_t last_subscribe_pid;
+    //packet ids
+    uint16_t next_pid;
+    uint16_t last_subscribe_pid;
     uint16_t last_publish_pid;
     uint16_t last_unsubscribe_pid;
+
     uint8_t connack_rc;          // 最近一次 CONNACK return code//用于调试
     uint8_t session_present;	// 最近一次 CONNACK session present 标志//用于调试
-    MQTT_Callbacks callbacks;     // 回调函数集合
 
+    int last_event_code;					//上次接收事件的事件代码，主要用于调试，被使用在input函数里面
+}MQTT_SESSION;
+
+typedef struct {
+    //keepalive runtime
+    uint32_t keepalive_ms;
+    uint32_t ping_timeout_ms;
+    uint32_t last_tx_ms;
+    uint32_t last_rx_ms;
+    uint32_t last_pingreq_ms;
+
+    uint8_t ping_outstanding; // 是否有未完成的 ping 请求
+
+}MQTT_Keepalive;
+
+
+
+typedef struct{
+	MQTT_config_t	param;					//参数结构体
+	MQTT_length_t   length;				    //长度结构体
+    MQTT_Buffers    io;					    //缓冲区结构体
+    MQTT_SESSION    ses;				    //会话状态结构体
+    MQTT_Keepalive  ka;			            //保活机制结构体
+    MQTT_Callbacks  callbacks;              // 回调函数集合
+    MQTT_Platform   platform;               // 平台相关函数集合
 }MQTT_TCB;
 
 
