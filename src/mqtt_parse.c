@@ -3,6 +3,114 @@
 #include "mqtt_type.h"
 #include "string.h" 
 
+
+
+int mqtt_parse_connack_view(const uint8_t* rx, uint32_t rx_len, mqtt_connack_view_t* view)
+{
+	if(rx == NULL || view == NULL) {
+		return MQTT_ERR_ARG; // 参数错误
+	}
+    if(rx_len < 2) {
+        return MQTT_ERR_INCOMPLETE; // 包不完整
+    }
+	if(rx[0] != 0x20) {
+		return MQTT_ERR_MALFORMED; // Not a CONNACK packet，参数错误
+	}
+	uint8_t rem_len_bytes;
+	uint32_t rem_len;
+	int res = mqtt_read_rem_len(rx + 1, rx_len - 1, &rem_len, &rem_len_bytes);
+	if(res == -2) {
+		return MQTT_ERR_INCOMPLETE; // 包不完整
+	} else if(res < 0) {
+		return MQTT_ERR_MALFORMED; // Error reading remaining length
+	}
+	uint32_t packet_len = 1 + rem_len_bytes + rem_len; // 先根据固定报头解析总长度，然后根据总长度判断接收的包是否完整
+	if(rx_len < packet_len) {
+		return MQTT_ERR_INCOMPLETE; // 接受的包不完整
+	}
+	if(rem_len != 2) {
+		return MQTT_ERR_MALFORMED; // CONNACK剩余长度必须是2
+	}
+	memset(view, 0, sizeof(*view));
+	uint16_t idx = 1 + rem_len_bytes; // 可变报头的起始位置
+	view->session_present = (uint8_t)(rx[idx] & 0x01);
+	view->return_code = rx[idx + 1];
+	return 0;
+}
+
+int mqtt_parse_suback_view(const uint8_t* rx, uint32_t rx_len, mqtt_suback_view_t* view)
+{
+    if(rx == NULL || view == NULL) {
+        return MQTT_ERR_ARG; // 参数错误
+    }
+    if(rx_len < 2) {
+        return MQTT_ERR_INCOMPLETE; // 包不完整，SUBACK最短是5字节
+    }
+    if(rx[0] != 0x90) {
+        return MQTT_ERR_MALFORMED; // Not a SUBACK packet，参数错误
+    }
+    uint8_t rem_len_bytes;
+    uint32_t rem_len;
+    int res = mqtt_read_rem_len(rx + 1, rx_len - 1, &rem_len, &rem_len_bytes);
+    if(res == -2) {
+        return MQTT_ERR_INCOMPLETE; // 包不完整
+    } else if(res < 0) {
+        return MQTT_ERR_MALFORMED; // Error reading remaining length
+    }
+    uint32_t packet_len = 1 + rem_len_bytes + rem_len; // 先根据固定报头解析总长度，然后根据总长度判断接收的包是否完整
+    if(rx_len < packet_len) {
+        return MQTT_ERR_INCOMPLETE; // 接受的包不完整
+    }
+    if(rem_len < 3) {
+        return MQTT_ERR_MALFORMED; // SUBACK剩余长度必须至少是3，因为要包含报文标识符2+至少1个返回码
+    }
+    uint32_t idx = 1 + rem_len_bytes; // 可变报头的起始位置
+    uint16_t pid = (uint16_t)(rx[idx] << 8 | rx[idx + 1]);// 报文标识符
+    idx += 2; // 返回码的起始位置
+    uint32_t rc_len32 = packet_len - idx; // 返回码的长度
+    if(rc_len32 == 0 || rc_len32 > 255) {
+        return MQTT_ERR_MALFORMED; // 返回码的长度必须至少是1，最多是255
+    }
+    memset(view, 0, sizeof(*view));
+    view->packet_id = pid;
+    view->return_codes = rx + idx;
+    view->return_codes_len = (uint8_t)rc_len32;
+    view->packet_len = packet_len;
+    return 0; // Success    
+}
+
+int mqtt_parse_unsuback_view(const uint8_t* rx, uint32_t rx_len, mqtt_unsuback_view_t* view)
+{
+	if(rx == NULL || view == NULL) {
+		return MQTT_ERR_ARG; // 参数错误
+	}
+	if(rx_len < 2) {
+		return MQTT_ERR_INCOMPLETE; // 包不完整，UNSUBACK最短是2字节
+	}
+	if(rx[0] != 0xB0) {
+		return MQTT_ERR_MALFORMED; // Not a UNSUBACK packet，参数错误
+	}
+	uint8_t rem_len_bytes;
+	uint32_t rem_len;
+	int res = mqtt_read_rem_len(rx + 1, rx_len - 1, &rem_len, &rem_len_bytes);
+	if(res == -2) {
+		return MQTT_ERR_INCOMPLETE; // 包不完整
+	} else if(res < 0) {
+		return MQTT_ERR_MALFORMED; // Error reading remaining length
+	}
+	uint32_t packet_len = 1 + rem_len_bytes + rem_len; // 先根据固定报头解析总长度，然后根据总长度判断接收的包是否完整
+	if(rx_len < packet_len) {
+		return MQTT_ERR_INCOMPLETE; // 接受的包不完整
+	}
+	if(rem_len != 2) {
+		return MQTT_ERR_MALFORMED; // UNSUBACK剩余长度必须是2
+	}
+	memset(view, 0, sizeof(*view));
+	uint16_t idx = 1 + rem_len_bytes; // 报文标识符的起始位置
+	view->packet_id = (uint16_t)(rx[idx] << 8 | rx[idx + 1]);
+	return 0;
+}
+
 int mqtt_parse_publish_view(const uint8_t* rx, uint32_t rx_len, mqtt_publish_view_t* view)
 {
 	if(rx == NULL || view == NULL || rx_len == 0 || rx_len < 2) {
@@ -59,73 +167,6 @@ int mqtt_parse_publish_view(const uint8_t* rx, uint32_t rx_len, mqtt_publish_vie
 	return 0; // Success
 }
 
-int mqtt_parse_connack_view(const uint8_t* rx, uint32_t rx_len, mqtt_connack_view_t* view)
-{
-	if(rx == NULL || view == NULL) {
-		return MQTT_ERR_ARG; // 参数错误
-	}
-    if(rx_len < 4) {
-        return MQTT_ERR_INCOMPLETE; // 包不完整
-    }
-	if(rx[0] != 0x20) {
-		return MQTT_ERR_MALFORMED; // Not a CONNACK packet，参数错误
-	}
-    if(rx[1] != 0x02) {
-        return MQTT_ERR_MALFORMED; // CONNACK剩余长度必须是2
-    }
-    if((rx[2] & 0xFE) != 0) {
-        return MQTT_ERR_MALFORMED; // 其他位必须为0，只有最低位是session present标志
-    }
-    if(rx[3] != 0x00 && rx[2] & 0x01) {
-        return MQTT_ERR_MALFORMED; // 如果返回码不为0，session present必须为0
-    }
-	memset(view, 0, sizeof(*view));
-	view->session_present = (uint8_t)(rx[2] & 0x01);
-	view->return_code = rx[3];
-	return 0;
-}
-
-int mqtt_parse_suback_view(const uint8_t* rx, uint32_t rx_len, mqtt_suback_view_t* view)
-{
-    if(rx == NULL || view == NULL) {
-        return MQTT_ERR_ARG; // 参数错误
-    }
-    if(rx_len < 2) {
-        return MQTT_ERR_INCOMPLETE; // 包不完整，SUBACK最短是5字节
-    }
-    if(rx[0] != 0x90) {
-        return MQTT_ERR_MALFORMED; // Not a SUBACK packet，参数错误
-    }
-    uint8_t rem_len_bytes;
-    uint32_t rem_len;
-    int res = mqtt_read_rem_len(rx + 1, rx_len - 1, &rem_len, &rem_len_bytes);
-    if(res == -2) {
-        return MQTT_ERR_INCOMPLETE; // 包不完整
-    } else if(res < 0) {
-        return MQTT_ERR_MALFORMED; // Error reading remaining length
-    }
-    uint32_t packet_len = 1 + rem_len_bytes + rem_len; // 先根据固定报头解析总长度，然后根据总长度判断接收的包是否完整
-    if(rx_len < packet_len) {
-        return MQTT_ERR_INCOMPLETE; // 接受的包不完整
-    }
-    if(rem_len < 3) {
-        return MQTT_ERR_MALFORMED; // SUBACK剩余长度必须至少是3，因为要包含报文标识符2+至少1个返回码
-    }
-    uint32_t idx = 1 + rem_len_bytes; // 可变报头的起始位置
-    uint16_t pid = (uint16_t)(rx[idx] << 8 | rx[idx + 1]);// 报文标识符
-    idx += 2; // 返回码的起始位置
-    uint32_t rc_len32 = packet_len - idx; // 返回码的长度
-    if(rc_len32 == 0 || rc_len32 > 255) {
-        return MQTT_ERR_MALFORMED; // 返回码的长度必须至少是1，最多是255
-    }
-    memset(view, 0, sizeof(*view));
-    view->packet_id = pid;
-    view->return_codes = rx + idx;
-    view->return_codes_len = (uint8_t)rc_len32;
-    view->packet_len = packet_len;
-    return 0; // Success    
-}
-
 int mqtt_parse_puback_view(const uint8_t* rx, uint32_t rx_len, mqtt_puback_view_t* view)
 {
 	if(rx == NULL || view == NULL) {
@@ -149,7 +190,7 @@ int mqtt_parse_puback_view(const uint8_t* rx, uint32_t rx_len, mqtt_puback_view_
 		return MQTT_ERR_MALFORMED; // PUBACK剩余长度必须是2
 	}
 	memset(view, 0, sizeof(*view));
-	uint8_t idx = 1 + rem_len_bytes; // 报文标识符的起始位置
+	uint16_t idx = 1 + rem_len_bytes; // 报文标识符的起始位置
 	view->packet_id = (uint16_t)(rx[idx] << 8 | rx[idx + 1]);
 	return 0;
 }

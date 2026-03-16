@@ -64,6 +64,9 @@ int MQTT_OnRx(MQTT_TCB* m, const uint8_t* rx_data, uint32_t rx_len)
 		case 0x90: {
 			return mqtt_handle_suback(m, rx_data, rx_len); // SUBACK
 		}
+		case 0xB0: {
+			return mqtt_handle_unsuback(m, rx_data, rx_len); // UNSUBACK
+		}
 		case 0xD0: {
 			return mqtt_handle_pingresp(m, rx_data, rx_len); // PINGRESP
 		}
@@ -132,66 +135,77 @@ int MQTT_InputBytes(MQTT_TCB* m, const uint8_t* data, uint32_t len)
 
 void MQTT_SetOnConnack(MQTT_TCB* m, mqtt_on_connack_cb cb, void* user_ctx)
 {
-	m->on_connack = cb;
-	m->user_ctx = user_ctx;
+	if(m == NULL) {
+		return; // Invalid callback
+	}
+	m->callbacks.on_connack = cb;
+	m->callbacks.on_connack_ctx = user_ctx;
 }
 
 
-void MQTT_SetOnMessage(MQTT_TCB* m, mqtt_on_message_cb cb, void* user_ctx)
+void MQTT_SetOnPublish(MQTT_TCB* m, mqtt_on_publish_cb cb, void* user_ctx)
 {
-	if((cb == NULL) || (m == NULL)){
+	if(m == NULL) {
 		return; // Invalid callback
 	}
-	m->on_message = cb;
-	m->user_ctx = user_ctx;
+	m->callbacks.on_publish = cb;
+	m->callbacks.on_publish_ctx = user_ctx;
 }
 
 void MQTT_SetOnSend(MQTT_TCB* m, mqtt_on_send_cb cb, void* user_ctx)
 {
-	if((cb == NULL) || (m == NULL)) {
+	if(m == NULL) {
 		return; // Invalid callback
 	}
-	m->on_send = cb;
-	m->user_ctx = user_ctx;
+	m->callbacks.on_send = cb;
+	m->callbacks.on_send_ctx = user_ctx;
 }
 void MQTT_SetOnSuback(MQTT_TCB* m, mqtt_on_suback_cb cb, void* user_ctx)
 {
-	if(!cb || !m) {
+	if(m == NULL) {
 		return; // Invalid callback
 	}
-	m->on_suback = cb;
-	m->user_ctx = user_ctx;
+	m->callbacks.on_suback = cb;
+	m->callbacks.on_suback_ctx = user_ctx;
+}
+
+void MQTT_SetOnUnsuback(MQTT_TCB* m, mqtt_on_unsuback_cb cb, void* user_ctx)
+{
+	if(m == NULL) {
+		return; // Invalid callback
+	}
+	m->callbacks.on_unsuback = cb;
+	m->callbacks.on_unsuback_ctx = user_ctx;
 }
 
 void MQTT_SetOnPingresp(MQTT_TCB* m, mqtt_on_pingresp_cb cb, void* user_ctx)
 {
-	if(!cb || !m) {
+	if(m == NULL) {
 		return; // Invalid callback
 	}
-	m->on_pingresp = cb;
-	m->user_ctx = user_ctx;
+	m->callbacks.on_pingresp = cb;
+	m->callbacks.on_pingresp_ctx = user_ctx;
 }
 
 void MQTT_SetOnPuback(MQTT_TCB* m, mqtt_on_puback_cb cb, void* user_ctx)
 {
-	if(!cb || !m) {
+	if(m == NULL) {
 		return; // Invalid callback
 	}
-	m->on_puback = cb;
-	m->user_ctx = user_ctx;
+	m->callbacks.on_puback = cb;
+	m->callbacks.on_puback_ctx = user_ctx;
 }
 
 void mqtt_emit_send(MQTT_TCB* m)
 {
-    if (m->on_send && m->length.Totallength > 0) {
-        m->on_send(m->user_ctx, m->buff, (uint16_t)m->length.Totallength);
-    }
-}
-
-void mqtt_emit_message(MQTT_TCB* m, const mqtt_publish_view_t* view)
-{
-    if (m->on_message) {
-        m->on_message(m->user_ctx, view);
+	if(m == NULL) {
+		return; // Invalid MQTT control block
+	}
+	if (m->callbacks.on_send == NULL) {
+		return; // No send callback registered
+	}
+    if (m->callbacks.on_send && m->length.Totallength > 0) {
+        m->callbacks.on_send(m->callbacks.on_send_ctx, m->buff, (uint16_t)m->length.Totallength);
     }
 }
 

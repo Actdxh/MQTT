@@ -13,15 +13,15 @@ int MQTT_OnRx(MQTT_TCB* m, const uint8_t* rx_data, uint32_t rx_len);
 
 /*--------------------回调函数的注册函数-------------------------*/
 void MQTT_SetOnConnack(MQTT_TCB* m, mqtt_on_connack_cb cb, void* user_ctx);
-void MQTT_SetOnMessage(MQTT_TCB* m, mqtt_on_message_cb cb, void* user_ctx);
+void MQTT_SetOnPublish(MQTT_TCB* m, mqtt_on_publish_cb cb, void* user_ctx);
 void MQTT_SetOnSend(MQTT_TCB* m, mqtt_on_send_cb cb, void* user_ctx);
 void MQTT_SetOnSuback(MQTT_TCB* m, mqtt_on_suback_cb cb, void* user_ctx);
+void MQTT_SetOnUnsuback(MQTT_TCB* m, mqtt_on_unsuback_cb cb, void* user_ctx);
 void MQTT_SetOnPingresp(MQTT_TCB* m, mqtt_on_pingresp_cb cb, void* user_ctx);
 void MQTT_SetOnPuback(MQTT_TCB* m, mqtt_on_puback_cb cb, void* user_ctx);
 
 /*--------------------封装的回调函数-------------------------*/
 void mqtt_emit_send(MQTT_TCB* m);
-void mqtt_emit_message(MQTT_TCB* m, const mqtt_publish_view_t* view);
 
 
 

@@ -61,7 +61,7 @@ void app_demo(void)
                 } else {
                     st = ST_SEND_CONNECT;
                 }
-                MQTT_SetOnMessage(&MqttA, my_on_message, &g_demo_ctx);
+                MQTT_SetOnPublish(&MqttA, my_on_publish, &g_demo_ctx);
 	            MQTT_SetOnSend(&MqttA, my_on_send, &g_demo_ctx);
                 MQTT_SetOnConnack(&MqttA, my_on_connack, &g_demo_ctx);
                 MQTT_SetOnSuback(&MqttA, my_on_suback, &g_demo_ctx);
@@ -167,7 +167,7 @@ void app_demo(void)
                 }else{
                     #ifdef MQTT_DEMO_DEBUG
                     if(puback_wait_guard % 10 == 0) { // 每10次打印一次
-                        printf("PUBACK not received for PID: %u\r\n", g_demo_ctx.puback_pid);
+                        printf("PUBACK EXPERT PID: %u, RECEIVED: %u\r\n", MqttA.last_publish_pid, g_demo_ctx.puback_pid);
                     }
                     #endif // DEBUG
                     st = ST_WAIT_PUBACK; // 继续等待 PUBACK 事件 

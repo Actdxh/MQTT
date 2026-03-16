@@ -193,7 +193,7 @@ int mqtt_pack_subscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const char
 }
 
 
-int mqtt_pack_unsubscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, char * topic)
+int mqtt_pack_unsubscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const char * topic)
 {
 	uint16_t p = 0;
 	uint16_t Fixedheader_len = 0;
@@ -225,7 +225,8 @@ int mqtt_pack_unsubscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, char * t
 	/************************可变报头*************************/ 
 	
 	out[p++] = m->MessageID/256;								//报文标识符高位 
-	out[p++] = m->MessageID%256;								//报文标识符低位 
+	out[p++] = m->MessageID%256;								//报文标识符低位
+	m->last_unsubscribe_pid = m->MessageID;
 	m->MessageID++;
 	if(m->MessageID == 0)
 	{

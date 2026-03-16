@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 
-void my_on_message(void* user_ctx, const mqtt_publish_view_t* msg)
+void my_on_publish(void* user_ctx, const mqtt_publish_view_t* msg)
 {
 	if(!msg) {
 		return; // 无效的消息视图
@@ -76,6 +76,11 @@ void my_on_suback(void* user_ctx, const mqtt_suback_view_t* v)
 	}else {
 		ctx->subscribed = MQTT_SUBSCRIBED_NONE; // 其他返回码也视为订阅失败
 	}
+}
+
+void my_on_unsuback(void* user_ctx, const mqtt_unsuback_view_t* v)
+{
+
 }
 
 void my_on_pingresp(void* user_ctx)

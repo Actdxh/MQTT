@@ -175,10 +175,10 @@ FileName=examples\src\app_demo.c
 CompileCpp=0
 Folder=
 Compile=1
-Link=1
+Link=0
 Priority=1000
-OverrideBuildCmd=0
-BuildCmd=
+OverrideBuildCmd=1
+BuildCmd=E:\APPWORK\Dev-Cpp\MinGW64\bin\gcc.exe -c "H:\GITHUB\MQTT\examples\src\app_demo.c" -o "H:\GITHUB\MQTT\examples\src\app_demo.o" -I"E:\APPWORK\Dev-Cpp\MinGW64\include" -I"E:\APPWORK\Dev-Cpp\MinGW64\x86_64-w64-mingw32\include" -I"E:\APPWORK\Dev-Cpp\MinGW64\lib\gcc\x86_64-w64-mingw32\4.9.2\include" -I"H:\GITHUB\MQTT\inc" -I"H:\GITHUB\MQTT\examples\inc" -I"H:\GITHUB\MQTT\examples\src" -I"H:\GITHUB\MQTT\src" -Dmy_on_publish=my_on_message
 
 [Unit15]
 FileName=inc\mqtt_type.h

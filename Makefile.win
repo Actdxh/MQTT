@@ -1,8 +1,8 @@
 # Project: MQTT
 # Makefile created by Dev-C++ 5.11
 
-CPP      = g++.exe
-CC       = gcc.exe
+CPP      = E:/APPWORK/Dev-Cpp/MinGW64/bin/g++.exe
+CC       = E:/APPWORK/Dev-Cpp/MinGW64/bin/gcc.exe
 WINDRES  = windres.exe
 OBJ      = examples/src/main.o src/mqtt_core.o src/mqtt_handlers.o src/mqtt_pack.o src/mqtt_parse.o src/mqtt_utils.o examples/src/app_cb.o examples/src/app_debug.o examples/src/app_demo.o
 LINKOBJ  = examples/src/main.o src/mqtt_core.o src/mqtt_handlers.o src/mqtt_pack.o src/mqtt_parse.o src/mqtt_utils.o examples/src/app_cb.o examples/src/app_debug.o examples/src/app_demo.o
@@ -12,7 +12,7 @@ INCS     = -I"E:/APPWORK/Dev-Cpp/MinGW64/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/
 CXXINCS  = -I"E:/APPWORK/Dev-Cpp/MinGW64/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"E:/APPWORK/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include/c++" -I"H:/GITHUB/MQTT/inc" -I"H:/GITHUB/MQTT/examples/inc" -I"H:/GITHUB/MQTT/examples/src" -I"H:/GITHUB/MQTT/src"
 BIN      = MQTT.exe
 CXXFLAGS = $(CXXINCS) 
-CFLAGS   = $(INCS) 
+CFLAGS   = $(INCS) -Dmy_on_publish=my_on_message 
 RM       = rm.exe -f
 
 .PHONY: all all-before all-after clean clean-custom

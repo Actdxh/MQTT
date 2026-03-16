@@ -5,6 +5,7 @@
 int mqtt_handle_publish(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len);
 int mqtt_handle_connack(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len);
 int mqtt_handle_suback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len);
+int mqtt_handle_unsuback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len);
 int mqtt_handle_pingresp(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len);
 int mqtt_handle_puback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len);
 
