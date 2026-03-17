@@ -54,7 +54,7 @@ void my_on_publish(void* user_ctx, const mqtt_publish_view_t* msg)
 	// 这里可以添加其他处理接收到的 PUBLISH 消息的逻辑，例如打印消息内容等
 };
 
-void my_on_send(void* user_ctx, const uint8_t* data, uint16_t len)
+int my_on_send(void* user_ctx, const uint8_t* data, uint16_t len)
 {
 	//不判断user_ctx因为这是作为一个可选字段，以后业务层的时候自定义其他作用
 	if(!data || len == 0) {

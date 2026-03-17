@@ -121,7 +121,7 @@ int mqtt_pack_connect(MQTT_TCB*m, uint8_t* out, uint16_t out_size, uint16_t keep
 	m->length.Remaining_len = Remaining_len;
 	m->length.Totallength = Totallength;
 	m->ses.tx_pending |= MQTT_PENDING_CONNECT; // Mark CONNECT as pending for transmission
-
+	m->length.pack_len.connect_buf_len = Totallength;
 	return m->length.Totallength; // Return the total length of the packed MQTT CONNECT message
 }
 
@@ -190,7 +190,7 @@ int mqtt_pack_subscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const char
 	m->length.Remaining_len = Remaining_len;
 	m->length.Totallength = Totallength;
 	m->ses.tx_pending |= MQTT_PENDING_SUBSCRIBE; // Mark SUBSCRIBE as pending for transmission
-	
+	m->length.pack_len.subscribe_buf_len = Totallength;
 	return Totallength;
 }
 
@@ -249,6 +249,7 @@ int mqtt_pack_unsubscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const ch
 	m->length.Load_len = Load_len;
 	m->length.Remaining_len = Remaining_len;
 	m->length.Totallength = Totallength;
+	m->length.pack_len.unsubscribe_buf_len = Totallength;
 	m->ses.tx_pending |= MQTT_PENDING_UNSUBSCRIBE; // Mark UNSUBSCRIBE as pending for transmission
 
 	return Totallength;
@@ -345,9 +346,11 @@ int mqtt_pack_publish(
 	}
 	if(qos == 1) {
 		m->ses.tx_pending |= MQTT_PENDING_PUBLISH_QOS1; // Mark PUBLISH as pending for transmission
+		m->length.pack_len.publish_buf_len = Totallength;
 	}else if(qos == 0)
 	{
 		m->ses.tx_pending |= MQTT_PENDING_PUBLISH_QOS0; // Mark PUBLISH as pending for transmission
+		m->length.pack_len.publish_buf_len = Totallength;
 	}
 	
 

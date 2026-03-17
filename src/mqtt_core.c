@@ -150,26 +150,20 @@ int mqtt_now_ms(MQTT_TCB* m)
 int MQTT_Process(MQTT_TCB* m)
 {
 	if(m == NULL) {
-		return -1; // Invalid MQTT control block
-	}
-	int bitmask = 0;
-	int res = Mqtt_PingProcess(m);
-	if(res < 0) {
-		return res; // Ping process resulted in an error
-	}
-	if(res == MQTT_PROCESS_PING_SENT) {
-		// 如果发送了 PING 请求，可以在这里设置一个标志位，方便在主循环中调试
-		bitmask |= MQTT_PING_RETRY_DEMO_BITMASK;
-	}
-	res = Mqtt_puback_retry_process(m);
-	if(res < 0) {
-		return res; // PUBACK retry process resulted in an error
-	}
-	if(res == MQTT_PROCESS_PUBACK_RETRY) {
-		// 如果重发了 PUBACK，可以在这里设置一个标志位，方便在主循环中调试
-		bitmask |= MQTT_PUBACK_RETRY_DEMO_BITMASK;
-	}
-	return bitmask; // 没有需要处理的事件
+        return MQTT_ERR_ARG;
+    }
+
+    int res = Mqtt_PingProcess(m);
+    if(res < 0) {
+        return res; // timeout/no_time/...
+    }
+
+    res = Mqtt_puback_retry_process(m);
+    if(res < 0) {
+        return res;
+    }
+	
+    return 0;
 }
 
 int Mqtt_puback_retry_process(MQTT_TCB* m)
@@ -332,71 +326,105 @@ void Mqtt_SetKeepalive(MQTT_TCB* m, uint16_t keepalive_ms, uint16_t ping_timeout
 	m->ka.ping_timeout_ms = ping_timeout_ms;
 }
 
-void mqtt_emit_send_buf(MQTT_TCB* m, const uint8_t* data, uint16_t len)
+int mqtt_emit_send_buf(MQTT_TCB* m, const uint8_t* data, uint16_t len)
 {
-	if(m == NULL) {
-		return; // Invalid MQTT control block
+	if(!m ||!m->callbacks.on_send || !data || len == 0) {
+		#ifdef MQTT_DEBUG
+		printf("mqtt_emit_send_buf: Invalid input parameters\n");
+		#endif
+		return MQTT_ERR_ARG; // Invalid input
 	}
-	if (m->callbacks.on_send == NULL) {
-		return; // No send callback registered
+	int rc = m->callbacks.on_send(m->callbacks.on_send_ctx, data, len);
+	if(rc < 0) {
+		#ifdef MQTT_DEBUG
+		printf("mqtt_emit_send_buf: Send callback returned error code %d\n", rc);
+		#endif
+		return rc; // Send callback returned an error
 	}
-	if(data == NULL || len == 0) {
-		return; // No data to send
+	if(rc != len) {
+		return MQTT_ERR_SEND_INCOMPLETE; // Send callback did not send all data
 	}
-    if (m->callbacks.on_send) {
-		m->callbacks.on_send(m->callbacks.on_send_ctx, data, len);
-    }
+	uint32_t now = mqtt_now_ms(m);
+	m->ka.last_tx_ms = now; // 更新最后发送时间用于保活
+
+	if(m->ses.puback_outstanding && m->ses.puback_sent_ms > 0) {
+		m->ses.puback_sent_ms = now; // 更新 PUBACK 发送时间用于重试
+	}
+	#ifdef MQTT_DEBUG
+	if(rc < 0)
 	{
-		int now = mqtt_now_ms(m);
-		//获取当前时间用于保活
-		m->ka.last_tx_ms = now;
-
-		//获取当前时间确认要不要去重发publish包
-		if((m->ses.puback_outstanding) && (m->ses.puback_sent_ms == 0)) {//确认是发送的publsih
-			m->ses.puback_sent_ms = now;
-		}
-
+		printf("mqtt_emit_send_buf: Send callback returned error code %d\n", rc);
+	} else {
+		printf("mqtt_emit_send_buf: Sent %d bytes successfully\n", rc);
 	}
+	#endif
+	return rc; // Success
 	
 }
 
-void mqtt_emit_send(MQTT_TCB* m)
+int mqtt_emit_send(MQTT_TCB* m)
 {
 	if(m == NULL) {
-		return; // Invalid MQTT control block
+		// #ifdef MQTT_DEBUG
+		// printf("mqtt_emit_send: Invalid MQTT control block\n");
+		// #endif
+		return MQTT_ERR_ARG; // Invalid MQTT control block
 	}
-	if(m->ses.tx_pending & (0xffff &~MQTT_PENDING_PUBACK)) {
+	if(m->ses.tx_pending & ((uint32_t) (0xfffffff &~MQTT_PENDING_PUBACK))) {
 		m->ses.tx_pending &= ~MQTT_PENDING_PINGREQ;
 	}
+	int rc;
 	if(m->ses.tx_pending == 0) {
 
 	}else if(m->ses.tx_pending & MQTT_PENDING_CONNECT) {
-		mqtt_emit_send_buf(m, m->io.connect_buf, m->length.pack_len.connect_buf_len);
+		rc = mqtt_emit_send_buf(m, m->io.connect_buf, m->length.pack_len.connect_buf_len);
+		if(rc < 0) {
+			return rc; // Send failed, keep the pending flag for retry
+		}
 		m->ses.tx_pending &= ~MQTT_PENDING_CONNECT; // 发送后清除待发送标志
 	}else if(m->ses.tx_pending & MQTT_PENDING_PUBACK) {
-		mqtt_emit_send_buf(m, m->io.puback_buf, m->length.pack_len.puback_buf_len);
+		rc = mqtt_emit_send_buf(m, m->io.puback_buf, m->length.pack_len.puback_buf_len);
+		if(rc < 0) {
+			return rc; // Send failed, keep the pending flag for retry
+		}
 		m->ses.tx_pending &= ~MQTT_PENDING_PUBACK;
 	}else if(m->ses.tx_pending & MQTT_PENDING_PUBLISH_QOS0) {
-		mqtt_emit_send_buf(m, m->io.publish_buf, m->length.pack_len.publish_buf_len);
+		rc = mqtt_emit_send_buf(m, m->io.publish_buf, m->length.pack_len.publish_buf_len);
+		if(rc < 0) {
+			return rc; // Send failed, keep the pending flag for retry
+		}
 		m->ses.tx_pending &= ~MQTT_PENDING_PUBLISH_QOS0;
 	}else if(m->ses.tx_pending & MQTT_PENDING_PUBLISH_QOS1) {
-		mqtt_emit_send_buf(m, m->io.publish_buf, m->length.pack_len.publish_buf_len);
+		rc = mqtt_emit_send_buf(m, m->io.publish_buf, m->length.pack_len.publish_buf_len);
+		if(rc < 0) {
+			return rc; // Send failed, keep the pending flag for retry
+		}
 		m->ses.tx_pending &= ~MQTT_PENDING_PUBLISH_QOS1;
 	}else if(m->ses.tx_pending & MQTT_PENDING_SUBSCRIBE) {
-		mqtt_emit_send_buf(m, m->io.subscribe_buf, m->length.pack_len.subscribe_buf_len);
+		rc = mqtt_emit_send_buf(m, m->io.subscribe_buf, m->length.pack_len.subscribe_buf_len);
+		if(rc < 0) {
+			return rc; // Send failed, keep the pending flag for retry
+		}
 		m->ses.tx_pending &= ~MQTT_PENDING_SUBSCRIBE;
 	}else if(m->ses.tx_pending & MQTT_PENDING_UNSUBSCRIBE) {
-		mqtt_emit_send_buf(m, m->io.unsubscribe_buf, m->length.pack_len.unsubscribe_buf_len);
+		rc = mqtt_emit_send_buf(m, m->io.unsubscribe_buf, m->length.pack_len.unsubscribe_buf_len);
+		if(rc < 0) {
+			return rc; // Send failed, keep the pending flag for retry
+		}
 		m->ses.tx_pending &= ~MQTT_PENDING_UNSUBSCRIBE;
 	}else if(m->ses.tx_pending & MQTT_PENDING_DISCONNECT) {
-		mqtt_emit_send_buf(m, m->io.disconnect_buf, m->length.pack_len.disconnect_buf_len);
+		rc = mqtt_emit_send_buf(m, m->io.disconnect_buf, m->length.pack_len.disconnect_buf_len);
+		if(rc < 0) {
+			return rc; // Send failed, keep the pending flag for retry
+		}
 		m->ses.tx_pending &= ~MQTT_PENDING_DISCONNECT;
 	}else if(m->ses.tx_pending & MQTT_PENDING_PINGREQ) {
-		mqtt_emit_send_buf(m, m->io.pingreq_buf, m->length.pack_len.pingreq_buf_len);
+		rc = mqtt_emit_send_buf(m, m->io.pingreq_buf, m->length.pack_len.pingreq_buf_len);
+		if(rc < 0) {
+			return rc; // Send failed, keep the pending flag for retry
+		}
 		m->ses.tx_pending &= ~MQTT_PENDING_PINGREQ;
 	}
-	
-
-
+	return 0; // Success
 }
 

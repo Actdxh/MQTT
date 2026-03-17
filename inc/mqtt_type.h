@@ -26,17 +26,17 @@ typedef enum {
     MQTT_CONN_CONNECTED = 1,
 } mqtt_conn_state_t;
 
-typedef enum {
-    MQTT_SUBSCRIBED_NONE = 0,
-    MQTT_SUBSCRIBED_ONE = 1,
-} mqtt_subscribed_state_t;
+// typedef enum {
+//     MQTT_SUBSCRIBED_NONE = 0,
+//     MQTT_SUBSCRIBED_ONE = 1,
+// } mqtt_subscribed_state_t;
 
-typedef struct {
-    volatile mqtt_conn_state_t connected;
-    volatile mqtt_subscribed_state_t subscribed;
-    volatile uint8_t pingresp_seen;
-    volatile uint16_t puback_pid;//0是无效值
-} app_ctx_t;
+// typedef struct {
+//     volatile mqtt_conn_state_t connected;
+//     volatile mqtt_subscribed_state_t subscribed;
+//     volatile uint8_t pingresp_seen;
+//     volatile uint16_t puback_pid;//0是无效值
+// } app_ctx_t;
 
 typedef enum {
     MQTT_RX_UNHANDLED = 0,
@@ -57,13 +57,14 @@ typedef enum {
 } mqtt_rx_event_t;
 
 typedef enum {
-    MQTT_ERR_ARG        	= -1,// 参数错误
-    MQTT_ERR_INCOMPLETE 	= -2,// 包不完整
-    MQTT_ERR_MALFORMED  	= -3,// 包格式错误
-    MQTT_ERR_UNSUPPORTED	= -4,// 不支持的功能，比如 QoS 2
-	MQTT_ERR_PID_MISMATCH 	= -5, // SUBACK 的报文标识符与最近一次 SUBSCRIBE 不匹配
-    MQTT_ERR_NO_TIME        = -6, // 没有获取当前时间的函数，无法处理超时相关功能
-    MQTT_ERR_TIMEOUT        = -7, // 超时
+    MQTT_ERR_ARG        	    = -1,// 参数错误
+    MQTT_ERR_INCOMPLETE 	    = -2,// 包不完整
+    MQTT_ERR_MALFORMED  	    = -3,// 包格式错误
+    MQTT_ERR_UNSUPPORTED	    = -4,// 不支持的功能，比如 QoS 2
+	MQTT_ERR_PID_MISMATCH 	    = -5, // SUBACK 的报文标识符与最近一次 SUBSCRIBE 不匹配
+    MQTT_ERR_NO_TIME            = -6, // 没有获取当前时间的函数，无法处理超时相关功能
+    MQTT_ERR_TIMEOUT            = -7, // 超时
+    MQTT_ERR_SEND_INCOMPLETE    = -8, // 发送数据不完整，可能需要重试
 } mqtt_err_t;
 
 typedef enum{
@@ -179,7 +180,7 @@ typedef struct {
 }mqtt_unsuback_view_t;
 
 typedef void (*mqtt_on_publish_cb)(void* user_ctx, const mqtt_publish_view_t* msg);
-typedef void (*mqtt_on_send_cb)(void* user_ctx, const uint8_t* data, uint16_t len);
+typedef int (*mqtt_on_send_cb)(void* user_ctx, const uint8_t* data, uint16_t len);
 typedef void (*mqtt_on_connack_cb)(void* user_ctx, const mqtt_connack_view_t* v);
 typedef void (*mqtt_on_suback_cb)(void* user_ctx, const mqtt_suback_view_t* v);
 typedef void (*mqtt_on_pingresp_cb)(void* user_ctx);

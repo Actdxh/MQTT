@@ -28,8 +28,8 @@ void MQTT_SetOnPuback(MQTT_TCB* m, mqtt_on_puback_cb cb, void* user_ctx);
 void MQTT_SetNowMs(MQTT_TCB* m, mqtt_now_ms_fn now_ms, void* user_ctx);
 void Mqtt_SetKeepalive(MQTT_TCB* m, uint16_t keepalive_ms, uint16_t ping_timeout_ms);
 /*--------------------封装的功能函数-------------------------*/
-void mqtt_emit_send_buf(MQTT_TCB* m, const uint8_t* data, uint16_t len);
-void mqtt_emit_send(MQTT_TCB* m);
+int mqtt_emit_send_buf(MQTT_TCB* m, const uint8_t* data, uint16_t len);
+int mqtt_emit_send(MQTT_TCB* m);
 
 
 

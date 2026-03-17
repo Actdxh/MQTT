@@ -8,7 +8,7 @@
 /*--------------------回调函数-------------------------*/
 void my_on_connack(void* user_ctx, const mqtt_connack_view_t* v);
 void my_on_publish(void* user_ctx, const mqtt_publish_view_t* msg);
-void my_on_send(void* user_ctx, const uint8_t* data, uint16_t len);
+int my_on_send(void* user_ctx, const uint8_t* data, uint16_t len);
 void my_on_suback(void* user_ctx, const mqtt_suback_view_t* v);
 void my_on_unsuback(void* user_ctx, const mqtt_unsuback_view_t* v);
 void my_on_pingresp(void* user_ctx);
