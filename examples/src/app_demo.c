@@ -64,8 +64,14 @@ static int suback_wait_guard = 0; // 用于防止死循环的简单计数器
 static int pingresp_wait_guard = 0; // 用于防止死循环的简单计数器
 static int puback_wait_guard = 0; // 用于防止死循环的简单计数器
 
+
+
 void app_demo(void)
 {
+    printf("-----------------------------------------------\r\n");
+    printf("Starting MQTT Client Demo\r\n");
+    printf("loop: connect -> subscribe -> publish -> ping -> reconnect\r\n");
+    printf("-----------------------------------------------\r\n");
     MQTT_TCB MqttA;
     app_demo_state_t st = ST_INIT;
     int guard = 0; // 用于防止死循环的简单计数器
@@ -695,6 +701,142 @@ void app_demo1(void)
     
 }
 
+void app_demo_reconnect_test(void)
+{
+    typedef enum {
+        DEMO_BOOT = 0,
+        DEMO_WAIT_CONNACK,
+        DEMO_RUN,
+        DEMO_DONE,
+        DEMO_ERROR,
+    } demo_state_t;
+
+    MQTT_TCB MqttA;
+    demo_state_t st = DEMO_BOOT;
+    int loop_guard = 0;
+    int connack_guard = 0;
+    int ping_sent_count = 0;
+    int pingresp_count = 0;
+    int pingresp_after_reconnect = 0;
+    int reconnect_count = 0;
+    int simulated_link_down = 0;
+
+    app_ctx_init(&g_demo_ctx);
+
+    printf("--------------------------------------------------------------\r\n");
+    printf("reconnect demo start\r\n");
+    printf("phase1: normal operation\r\n");
+    printf("phase2: simulate network down -> ping timeout -> reconnect\r\n");
+    printf("--------------------------------------------------------------\r\n");
+
+    while(st != DEMO_DONE && st != DEMO_ERROR) {
+        if(++loop_guard > 800) {
+            printf("reconnect demo: guard break\r\n");
+            st = DEMO_ERROR;
+            break;
+        }
+
+        switch(st) {
+            case DEMO_BOOT: {
+                if(app_demo_init(&MqttA) < 0) {
+                    st = DEMO_ERROR;
+                    break;
+                }
+
+                MQTT_SetAllOnCb_same(&MqttA, &(MQTT_Callbacks){
+                    .on_connack = my_on_connack,
+                    .on_connack_ctx = &g_demo_ctx,
+                    .on_publish = my_on_publish,
+                    .on_publish_ctx = &g_demo_ctx,
+                    .on_send = my_on_send,
+                    .on_send_ctx = &MqttA,
+                    .on_suback = my_on_suback,
+                    .on_suback_ctx = &g_demo_ctx,
+                    .on_unsuback = my_on_unsuback,
+                    .on_unsuback_ctx = &g_demo_ctx,
+                    .on_pingresp = my_on_pingresp,
+                    .on_pingresp_ctx = &g_demo_ctx,
+                    .on_puback = my_on_puback,
+                    .on_puback_ctx = &g_demo_ctx,
+                });
+
+                MQTT_SetNowMs(&MqttA, my_now_ms, &g_clock);
+                Mqtt_SetKeepalive(&MqttA, 2000, 1200);
+
+                mqtt_pack_connect(&MqttA, MqttA.io.connect_buf, MQTT_CONNECT_BUF_SIZE, 10000);
+                mqtt_emit_send(&MqttA);
+                connack_guard = 0;
+                st = DEMO_WAIT_CONNACK;
+            } break;
+
+            case DEMO_WAIT_CONNACK: {
+                app_evt_t e;
+                if(++connack_guard > 80) {
+                    printf("reconnect demo: wait CONNACK timeout\r\n");
+                    st = DEMO_ERROR;
+                    break;
+                }
+                if(app_evt_pop(&g_demo_ctx, &e) == 1 && e.type == APP_EVT_CONNACK_OK) {
+                    printf("reconnect demo: connected, start idle loop for auto keepalive\r\n");
+                    st = DEMO_RUN;
+                }
+            } break;
+
+            case DEMO_RUN: {
+                app_evt_t e;
+                while(app_evt_pop(&g_demo_ctx, &e) == 1) {
+                    if(e.type == APP_EVT_PINGRESP) {
+                        pingresp_count++;
+                        if(reconnect_count > 0) {
+                            pingresp_after_reconnect++;
+                        }
+                        printf("reconnect demo: got PINGRESP #%d\r\n", pingresp_count);
+                    }
+                }
+
+                if((!simulated_link_down) && pingresp_count >= 1) {
+                    simulated_link_down = 1;
+                    printf("reconnect demo: simulate network down (disable on_send)\r\n");
+                    MQTT_SetOnSend(&MqttA, NULL, NULL);
+                }
+
+                if(reconnect_count >= 1 && pingresp_after_reconnect >= 1) {
+                    st = DEMO_DONE;
+                }
+            } break;
+
+            default:
+                st = DEMO_ERROR;
+                break;
+        }
+
+        delay_ms(&g_clock, 100);
+        {
+            int pr = MQTT_Process(&MqttA);
+            if(pr == MQTT_PROCESS_PING_SENT) {
+                ping_sent_count++;
+                printf("reconnect demo: ping sent #%d\r\n", ping_sent_count);
+            } else if(pr == MQTT_ERR_NEED_RECONNECT) {
+                reconnect_count++;
+                printf("reconnect demo: ping timeout, reconnect #%d\r\n", reconnect_count);
+                MQTT_ReconnectReset(&MqttA);
+
+                MQTT_SetOnSend(&MqttA, my_on_send, &MqttA);
+                mqtt_pack_connect(&MqttA, MqttA.io.connect_buf, MQTT_CONNECT_BUF_SIZE, 10000);
+                mqtt_emit_send(&MqttA);
+                connack_guard = 0;
+                st = DEMO_WAIT_CONNACK;
+            }
+        }
+    }
+
+    if(st == DEMO_DONE) {
+        printf("reconnect demo done: ping_sent=%d pingresp=%d reconnect=%d\r\n", ping_sent_count, pingresp_count, reconnect_count);
+    } else {
+        printf("reconnect demo error: ping_sent=%d pingresp=%d reconnect=%d\r\n", ping_sent_count, pingresp_count, reconnect_count);
+    }
+}
+
 void app_demo_test(void)
 {
     //这是一个完整的示例，从初始化到连接服务器，再到订阅主题，最后发布消息，最后断开连接
@@ -732,8 +874,6 @@ int app_demo_init(MQTT_TCB* m)
     };
     res = MQTT_Init(m, &configA);
     #ifdef MQTT_DEMO_DEBUG
-    printf("--------------------------------------------------------------\r\n");
-    printf("--------------------------------------------------------------\r\n");
     if(res != 0) {
 		printf("Failed to initialize MQTT Client A\r\n");
 		return -1;

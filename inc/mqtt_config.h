@@ -1,0 +1,43 @@
+#ifndef MQTT_CONFIG_H
+#define MQTT_CONFIG_H
+
+#ifndef PARA_SIZE
+#define PARA_SIZE 64
+#endif
+
+#ifndef BUFF_SIZE
+#define BUFF_SIZE 256
+#endif
+#ifndef MQTT_TXBUF_SIZE
+#define MQTT_TXBUF_SIZE 1024
+#endif
+
+#ifndef MQTT_RXBUF_SIZE
+#define MQTT_RXBUF_SIZE 1024
+#endif
+
+#ifndef  MQTT_CONNECT_BUF_SIZE
+#define MQTT_CONNECT_BUF_SIZE 256
+#endif
+#ifndef MQTT_PUBLISH_BUF_SIZE
+#define MQTT_PUBLISH_BUF_SIZE 256
+#endif
+#ifndef MQTT_SUBSCRIBE_BUF_SIZE
+#define MQTT_SUBSCRIBE_BUF_SIZE 256
+#endif
+#ifndef MQTT_UNSUBSCRIBE_BUF_SIZE
+#define MQTT_UNSUBSCRIBE_BUF_SIZE 256
+#endif
+#ifndef MQTT_PINGREQ_BUF_SIZE
+#define MQTT_PINGREQ_BUF_SIZE 256
+#endif
+#ifndef MQTT_PUBACK_BUF_SIZE
+#define MQTT_PUBACK_BUF_SIZE 256
+#endif
+#ifndef MQTT_DISCONNECT_BUF_SIZE
+#define MQTT_DISCONNECT_BUF_SIZE 256
+#endif
+#ifndef MQTT_SUB_CACHE_TOPIC_SIZE
+#define MQTT_SUB_CACHE_TOPIC_SIZE 64//缓存用于reconnect后sub的话题
+#endif
+#endif // !MQTT_CONFIG_H

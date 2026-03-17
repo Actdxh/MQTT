@@ -14,8 +14,8 @@
 int main(int argc, char *argv[]) {
 
 
-	app_demo();
-
+	// app_demo();
+	app_demo_reconnect_test();
 
 	printf("\r\n");
 	return 0;
