@@ -8,7 +8,28 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+
 #define MQTT_DEMO_DEBUG
+//#define MQTT_DEMO_KEEPALIVE_TEST // 定义这个宏来测试保活机制
+
+typedef struct {
+    uint32_t now_ms;
+} demo_clock_t;
+
+static demo_clock_t g_clock = {0};
+
+uint32_t my_now_ms(void* user_ctx)
+{
+    demo_clock_t* c = (demo_clock_t*)user_ctx;
+    return c->now_ms;
+}
+
+void delay_ms(void* user_ctx, uint32_t ms)
+{
+    demo_clock_t* c = (demo_clock_t*)user_ctx;
+    c->now_ms += ms;
+}
+
 
 typedef enum {
 	ST_INIT = 0,
@@ -30,31 +51,33 @@ typedef enum {
 
     ST_DONE,
 	ST_ERROR,
+    ST_NONE,//让while卡死在这个位置等keepalive的事件
 
 } app_demo_state_t;
 
 
 int i; 
 int res;
-uint8_t databuf[128];
-uint16_t datalen;
 static app_evt_queue_t g_demo_ctx; // 全局应用事件队列
 static int connack_wait_guard = 0; // 用于防止死循环的简单计数器
 static int suback_wait_guard = 0; // 用于防止死循环的简单计数器
 static int pingresp_wait_guard = 0; // 用于防止死循环的简单计数器
 static int puback_wait_guard = 0; // 用于防止死循环的简单计数器
+
 void app_demo(void)
 {
     MQTT_TCB MqttA;
     app_demo_state_t st = ST_INIT;
     int guard = 0; // 用于防止死循环的简单计数器
     while(st != ST_DONE && st != ST_ERROR) {
+        #ifndef MQTT_DEMO_KEEPALIVE_TEST
         if(++guard > 1000)
         {
             printf("app_demo: guard break!\r\n");
             st = ST_ERROR;
             break;
         }
+        #endif // !MQTT_DEMO_KEEPALIVE_TEST
         switch (st)
         {
             case ST_INIT:{
@@ -81,11 +104,13 @@ void app_demo(void)
                     .on_puback = my_on_puback,
                     .on_puback_ctx = &g_demo_ctx,
                 }); // 注册回调函数
+                MQTT_SetNowMs(&MqttA, my_now_ms, &g_clock); // 设置当前时间函数
+                Mqtt_SetKeepalive(&MqttA, 10000, 2000); // 设置保活间隔为 10 秒，PING 超时为 2 秒
             }
                 break;
             case ST_SEND_CONNECT:{
                 connack_wait_guard = 0;
-                mqtt_pack_connect(&MqttA, MqttA.io.tx_buf, BUFF_SIZE, 10000);
+                mqtt_pack_connect(&MqttA, MqttA.io.connect_buf, MQTT_CONNECT_BUF_SIZE, 10000);
                 mqtt_emit_send(&MqttA);
                 #ifdef MQTT_DEMO_DEBUG
                 printf("MQTT CONNECT message sent\r\n");
@@ -133,7 +158,7 @@ void app_demo(void)
                 break;
             case ST_SEND_SUBSCRIBE:{
                 suback_wait_guard = 0;
-                mqtt_pack_subscribe(&MqttA, MqttA.io.tx_buf, BUFF_SIZE, "TOPIC001", 0);
+                mqtt_pack_subscribe(&MqttA, MqttA.io.subscribe_buf, MQTT_SUBSCRIBE_BUF_SIZE, "TOPIC001", 0);
                 mqtt_emit_send(&MqttA);
                 st = ST_FEED_SUBACK;
             }
@@ -194,7 +219,7 @@ void app_demo(void)
                     .retain = 0,
                     .dup = 0
                 };
-                mqtt_pack_publish_two(&MqttA, MqttA.io.tx_buf, BUFF_SIZE, &params);
+                mqtt_pack_publish_two(&MqttA, MqttA.io.publish_buf, MQTT_PUBLISH_BUF_SIZE, &params);
                 mqtt_emit_send(&MqttA);
                 #ifdef MQTT_DEMO_DEBUG
                 printf("MQTT_NEW_PID: %u\r\n", MqttA.ses.last_publish_pid);
@@ -242,7 +267,11 @@ void app_demo(void)
                     #ifdef MQTT_DEMO_DEBUG
                     printf("PUBACK received for PID: %u\r\n", e.pid);
                     #endif // DEBUG
+                    #ifdef MQTT_DEMO_KEEPALIVE_TEST
+                    st = ST_NONE; // 收到 PUBACK，回到等待状态，继续测试保活机制
+                    #else
                     st = ST_SEND_PING; // 收到 PUBACK，进入下一步
+                    #endif // KEEPALIVE_TEST
                 }else{
 					#ifdef MQTT_DEMO_DEBUG
                     if(puback_wait_guard % 10 == 0) { // 每10次打印一次
@@ -253,6 +282,7 @@ void app_demo(void)
                 }
             }
                 break;
+            #ifndef MQTT_DEMO_KEEPALIVE_TEST
             case ST_SEND_PING:{
                 pingresp_wait_guard = 0; // 确保等待 PINGRESP 的计数器被正确初始化
                 mqtt_pack_pingreq(&MqttA);
@@ -292,7 +322,11 @@ void app_demo(void)
                     #ifdef MQTT_DEMO_DEBUG
                     printf("PINGRESP received!\r\n");
                     #endif // DEBUG
-                    st = ST_DONE; // 收到 PINGRESP，流程完成
+                    #ifdef MQTT_DEMO_KEEPALIVE_TEST
+                    st = ST_NONE; // 收到 PINGRESP，回到等待状态，继续测试保活机制
+                    #else
+                    st = ST_DONE; // 收到 PINGRESP，进入完成状态
+                    #endif // KEEPALIVE_TEST 
                 }else 
                 {
                     #ifdef MQTT_DEMO_DEBUG
@@ -304,10 +338,43 @@ void app_demo(void)
                 }
             }
                 break;
+            #endif
             default:
-                st = ST_ERROR;
+                #ifdef MQTT_DEMO_KEEPALIVE_TEST
+                st = ST_NONE;
+                #else
+                st = ST_ERROR; // 未知状态，进入错误状态
+                #endif // DEBUG
+                
                 break;
                  
+        }
+        delay_ms(&g_clock, 100); // 模拟一些处理时间，避免过快循环
+        int bitmask = MQTT_Process(&MqttA);
+        if(bitmask == MQTT_ERR_TIMEOUT) {
+            #ifdef MQTT_DEMO_DEBUG
+            printf("Process timeout detected in main loop!\r\n");
+            #endif // DEBUG
+            st = ST_ERROR; // PING 请求超时，进入错误状态
+        }
+        if((bitmask & MQTT_PUBACK_RETRY_DEMO_BITMASK) != 0) {
+            uint16_t pid = MqttA.ses.last_publish_pid; // 获取刚才发送的 PUBLISH 报文的 Packet ID
+            uint8_t pid_high = (pid >> 8) & 0xFF;
+            uint8_t pid_low = pid & 0xFF;
+            char puback_hex[32];
+            snprintf(puback_hex, sizeof(puback_hex), "40 02 %02X %02X", pid_high, pid_low);
+            feed_data(&MqttA, puback_hex); // 模拟服务器返回 PUBACK 包，表示已收到 QoS 1 的 PUBLISH 包
+            #ifdef MQTT_DEMO_DEBUG
+            printf("PUBACK retry sent in main loop for PID: %u\r\n", pid);
+            #endif // DEBUG
+        }
+        if((bitmask & MQTT_PING_RETRY_DEMO_BITMASK) != 0) {
+            #ifdef MQTT_DEMO_KEEPALIVE_TEST
+            feed_data(&MqttA, "D0 00");
+            #endif // KEEPALIVE_TEST
+            #ifdef MQTT_DEMO_DEBUG
+            printf("PING request sent in main loop!\r\n");
+            #endif // DEBUG
         }
     }
 
@@ -351,7 +418,8 @@ int app_demo_init(MQTT_TCB* m)
         .WillData = "WILL001",
         .WillRetain = 0,
         .WillQoS = 0,
-        .CleanSession = 1
+        .CleanSession = 1,
+        .puback_timeout_ms = 5000, // 设置 PUBACK 超时时间为 5 秒
     };
     res = MQTT_Init(m, &configA);
     #ifdef MQTT_DEMO_DEBUG
@@ -387,7 +455,7 @@ int app_demo_connect(MQTT_TCB* m)
     printf("--------------------------------------------------------------\r\n");
     printf("--------------------------------------------------------------\r\n");
     printf("MQTT Client A Connect:\r\n");
-    res = mqtt_pack_connect(m, m->io.tx_buf, BUFF_SIZE, 10000);
+    res = mqtt_pack_connect(m, m->io.connect_buf, sizeof(m->io.connect_buf), 10000);
     if(res < 0) {
         #ifdef MQTT_DEMO_DEBUG
         printf("Failed to pack MQTT CONNECT message res: %d\r\n", res);
@@ -396,9 +464,9 @@ int app_demo_connect(MQTT_TCB* m)
     }else {
         #ifdef MQTT_DEMO_DEBUG
         printf("MQTT CONNECT message packed successfully, length: %d\r\n", res);
-        for(i = 0; i < m->length.Totallength; i++)
+        for(i = 0; i < m->length.pack_len.connect_buf_len; i++)
         {
-            printf("%02x ", m->io.tx_buf[i]);
+            printf("%02x ", m->io.connect_buf[i]);
         }
         printf("\r\n");
         #endif // DEBUG
@@ -432,7 +500,7 @@ int app_demo_subscribe(MQTT_TCB* m)
     //这是一个订阅主题的示例，展示了如何使用 MQTT_pack_subscribe 函数来构建订阅报文，并通过回调函数处理服务器的响应
     printf("--------------------------------------------------------------\r\n");
     printf("--------------------------------------------------------------\r\n");
-    res = mqtt_pack_subscribe(m, m->io.tx_buf, BUFF_SIZE, "TEST", 1);
+    res = mqtt_pack_subscribe(m, m->io.subscribe_buf, sizeof(m->io.subscribe_buf), "TEST", 1);
     if(res < 0) {
         #ifdef MQTT_DEMO_DEBUG
         printf("Failed to pack MQTT SUBSCRIBE message res: %d\r\n", res);
@@ -441,9 +509,9 @@ int app_demo_subscribe(MQTT_TCB* m)
     }else {
         #ifdef MQTT_DEMO_DEBUG
         printf("MQTT SUBSCRIBE message packed successfully, length: %d\r\n", res);
-        for(i = 0; i < m->length.Totallength; i++)
+        for(i = 0; i < m->length.pack_len.subscribe_buf_len; i++)
         {
-            printf("%02x ", m->io.tx_buf[i]);
+            printf("%02x ", m->io.subscribe_buf[i]);
         }
         printf("\r\n");
         #endif // DEBUG
@@ -478,7 +546,7 @@ int app_demo_unsubscribe(MQTT_TCB* m)
     printf("--------------------------------------------------------------\r\n");
     printf("--------------------------------------------------------------\r\n");
     //这是一个取消订阅的示例，展示了如何使用 MQTT_pack_unsubscribe 函数来构建取消订阅报文
-    res = mqtt_pack_unsubscribe(m, m->io.tx_buf, BUFF_SIZE, "TEST");
+    res = mqtt_pack_unsubscribe(m, m->io.unsubscribe_buf, sizeof(m->io.unsubscribe_buf), "TEST");
     if(res < 0) {
         #ifdef MQTT_DEMO_DEBUG
         printf("Failed to pack MQTT UNSUBSCRIBE message res: %d\r\n", res);
@@ -487,9 +555,9 @@ int app_demo_unsubscribe(MQTT_TCB* m)
     }else {
         #ifdef MQTT_DEMO_DEBUG
         printf("MQTT UNSUBSCRIBE message packed successfully, length: %d\r\n", res);
-        for(i = 0; i < m->length.Totallength; i++)
+        for(i = 0; i < m->length.pack_len.unsubscribe_buf_len; i++)
         {
-            printf("%02x ", m->io.tx_buf[i]);
+            printf("%02x ", m->io.unsubscribe_buf[i]);
         }
         printf("\r\n");
         #endif // DEBUG
@@ -510,7 +578,7 @@ int app_demo_publish(MQTT_TCB* m)
                     .retain = 0,
                     .dup = 0
                 };
-    res = mqtt_pack_publish_two(m, m->io.tx_buf, BUFF_SIZE, &params);
+    res = mqtt_pack_publish_two(m, m->io.publish_buf, sizeof(m->io.publish_buf), &params);
     if(res < 0) {
         #ifdef MQTT_DEMO_DEBUG
         printf("Failed to pack MQTT PUBLISH message res: %d\r\n", res);
@@ -519,9 +587,9 @@ int app_demo_publish(MQTT_TCB* m)
     }else {
         #ifdef MQTT_DEMO_DEBUG
         printf("MQTT PUBLISH message packed successfully, length: %d\r\n", res);
-        for(i = 0; i < m->length.Totallength; i++)
+        for(i = 0; i < m->length.pack_len.publish_buf_len; i++)
         {
-            printf("%02x ", m->io.tx_buf[i]);
+            printf("%02x ", m->io.publish_buf[i]);
         }
         printf("\r\n");
         #endif // DEBUG
@@ -537,7 +605,7 @@ int app_demo_pack_puback_myself(MQTT_TCB* m)
     #ifdef MQTT_DEMO_DEBUG
     printf("Start parse myself publish message:\r\n");
     #endif // DEBUG
-    res = MQTT_InputBytes(m, m->io.tx_buf, m->length.Totallength);
+    res = MQTT_InputBytes(m, m->io.publish_buf, m->length.pack_len.publish_buf_len);
     #ifdef MQTT_DEMO_DEBUG
     if(res < 0) {
         printf("Failed to parse myself PUBLISH message res: %d\r\n", res);
@@ -598,9 +666,9 @@ int app_demo_ping(MQTT_TCB* m)
     mqtt_pack_pingreq(m);
     #ifdef MQTT_DEMO_DEBUG
     printf("MQTT PINGREQ message packed successfully!\r\n");
-    for(i = 0; i < m->length.Totallength; i++)
+    for(i = 0; i < m->length.pack_len.pingreq_buf_len; i++)
     {
-        printf("%02x ", m->io.tx_buf[i]);
+        printf("%02x ", m->io.pingreq_buf[i]);
     }
     printf("\r\n");
     #endif // DEBUG
@@ -632,7 +700,7 @@ int app_demo_parse_puback(MQTT_TCB* m)
     printf("--------------------------------------------------------------\r\n");
     printf("--------------------------------------------------------------\r\n");
     mqtt_pack_puback(m, 1);
-    res = MQTT_InputBytes(m, m->io.tx_buf, (uint16_t)m->length.Totallength);
+    res = MQTT_InputBytes(m, m->io.puback_buf, (uint16_t)m->length.pack_len.puback_buf_len);
     #ifdef MQTT_DEMO_DEBUG
     if(res < 0)
     {

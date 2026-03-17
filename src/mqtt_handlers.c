@@ -130,8 +130,10 @@ int mqtt_handle_pingresp(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 	if(m->callbacks.on_pingresp) {
 		m->callbacks.on_pingresp(m->callbacks.on_pingresp_ctx);
 	}
+	m->ka.ping_outstanding = 0; // 收到 PINGRESP 后重置 ping 状态
 	return MQTT_RX_PINGRESP; // 处理了 PINGRESP 包
 }
+
 int mqtt_handle_puback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 {
 	if(m == NULL || rx == NULL) {
@@ -144,6 +146,13 @@ int mqtt_handle_puback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 	int res = mqtt_parse_puback_view(rx, rx_len, &view);
 	if(res < 0) {
 		return res; // 解析失败
+	}
+	if((m->ses.puback_outstanding == 1) && (view.packet_id == m->ses.puback_pid)) {
+		m->ses.puback_outstanding = 0; // 收到 PUBACK 后重置状态
+		m->ses.puback_pid = 0;
+		m->ses.puback_sent_ms = 0;
+		m->ses.puback_retry_count = 0;
+		m->ses.puback_frame_len = 0;
 	}
 	if(m->callbacks.on_puback) {
 		m->callbacks.on_puback(m->callbacks.on_puback_ctx, &view);

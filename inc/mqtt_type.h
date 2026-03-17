@@ -5,13 +5,19 @@
 
 #define PARA_SIZE 64
 #define BUFF_SIZE 256
-#define TOPIC_SIZE 256
-#define DATA_SIZE 256
+#define MQTT_TXBUF_SIZE 1024
 
 #ifndef MQTT_RXBUF_SIZE
 #define MQTT_RXBUF_SIZE 1024
 #endif
 
+#define MQTT_CONNECT_BUF_SIZE 256
+#define MQTT_PUBLISH_BUF_SIZE 256
+#define MQTT_SUBSCRIBE_BUF_SIZE 256
+#define MQTT_UNSUBSCRIBE_BUF_SIZE 256
+#define MQTT_PINGREQ_BUF_SIZE 256
+#define MQTT_PUBACK_BUF_SIZE 256
+#define MQTT_DISCONNECT_BUF_SIZE 256
 
 
 
@@ -56,9 +62,42 @@ typedef enum {
     MQTT_ERR_MALFORMED  	= -3,// 包格式错误
     MQTT_ERR_UNSUPPORTED	= -4,// 不支持的功能，比如 QoS 2
 	MQTT_ERR_PID_MISMATCH 	= -5, // SUBACK 的报文标识符与最近一次 SUBSCRIBE 不匹配
+    MQTT_ERR_NO_TIME        = -6, // 没有获取当前时间的函数，无法处理超时相关功能
+    MQTT_ERR_TIMEOUT        = -7, // 超时
 } mqtt_err_t;
 
+typedef enum{
+    MQTT_PROCESS_NONE = 0,
+    MQTT_PROCESS_PING_SENT = 1,
+    MQTT_PROCESS_PUBACK_RETRY = 10,
+} mqtt_process_event_t;
+
+typedef enum{
+    MQTT_PENDING_NONE           = 0,
+    MQTT_PENDING_CONNECT        = (1u << 0),
+    MQTT_PENDING_SUBSCRIBE      = (1u << 1),
+    MQTT_PENDING_PUBLISH_QOS0   = (1u << 2),
+    MQTT_PENDING_PUBLISH_QOS1   = (1u << 3),
+    MQTT_PENDING_PUBACK         = (1u << 4),
+    MQTT_PENDING_UNSUBSCRIBE    = (1u << 5),
+    MQTT_PENDING_DISCONNECT     = (1u << 6),
+    MQTT_PENDING_PINGREQ        = (1u << 7),  
+}mqtt_pending_bits_t;
+
+
+typedef struct 
+{
+    uint16_t connect_buf_len;					//连接报文长度
+    uint16_t publish_buf_len;					//发布报文长度
+    uint16_t subscribe_buf_len;				//订阅报文长度
+    uint16_t unsubscribe_buf_len;				//取消订阅报文长度
+    uint16_t pingreq_buf_len;					//ping请求报文长度
+    uint16_t puback_buf_len;					//puback报文长度
+    uint16_t disconnect_buf_len;				//断开连接报文长度
+}mqtt_pack_len_t;
+
 typedef struct{
+
 	uint16_t cid_len;
 	uint16_t user_len;
 	uint16_t pwd_len;
@@ -69,7 +108,8 @@ typedef struct{
 	uint32_t Remaining_len;						//剩余长度 
 	uint32_t Variableheader_len;				//可变报头长度
 	uint32_t Load_len;							//负载长度 
-	uint32_t Totallength;						//报文总长度 
+	uint32_t Totallength;						//报文总长度
+    mqtt_pack_len_t pack_len;					//各种报文的长度，方便调试和重发时使用
 }MQTT_length_t;
 
 
@@ -83,9 +123,11 @@ typedef struct{
 	char WillRetain;						//遗嘱保留标志，1保留，0不保留
 	char WillQoS;							//遗嘱服务等级，0、1、2
 	char CleanSession;						//连接会话清除标志，1清除，0不清除
+    uint32_t puback_timeout_ms; // PUBACK 超时时间
 }MQTT_config_t;
 
 typedef struct{
+    
     const char* topic;
     const void* payload;
     uint16_t payload_len;
@@ -173,12 +215,21 @@ typedef struct
     uint8_t  rx_buf[MQTT_RXBUF_SIZE];		//接收缓冲区		这是用在input函数里面处理服务器发来信息的接受缓冲
 	uint16_t rx_buf_len;					//接收缓冲区长度	这是用在input函数里面处理服务器发来信息的接受缓冲的长度
 
-    uint8_t  tx_buf[BUFF_SIZE];		//发送缓冲区
+    uint8_t  connect_buf[MQTT_CONNECT_BUF_SIZE];	//连接报文缓冲区
+    uint8_t  publish_buf[MQTT_PUBLISH_BUF_SIZE];			//发布报文缓冲区
+    uint8_t  subscribe_buf[MQTT_SUBSCRIBE_BUF_SIZE];		//订阅报文缓冲区
+    uint8_t  unsubscribe_buf[MQTT_UNSUBSCRIBE_BUF_SIZE];		//取消订阅报文缓冲区
+    uint8_t  pingreq_buf[MQTT_PINGREQ_BUF_SIZE];			//ping请求报文缓冲区
+    uint8_t  puback_buf[MQTT_PUBACK_BUF_SIZE];			//puback报文缓冲区
+    uint8_t  disconnect_buf[MQTT_DISCONNECT_BUF_SIZE];		//断开连接报文缓冲区
+    // uint8_t  tx_buf[MQTT_TXBUF_SIZE];		//发送缓冲区
 
 }MQTT_Buffers;
 
 typedef struct{
     //packet ids
+    uint32_t tx_pending;
+
     uint16_t next_pid;
     uint16_t last_subscribe_pid;
     uint16_t last_publish_pid;
@@ -186,6 +237,14 @@ typedef struct{
 
     uint8_t connack_rc;          // 最近一次 CONNACK return code//用于调试
     uint8_t session_present;	// 最近一次 CONNACK session present 标志//用于调试
+
+    // QoS1 单 inflight 重发
+    uint8_t  puback_outstanding;      // 1=有QoS1 PUBLISH在等PUBACK
+    uint16_t puback_pid;              // 正在等待的PID
+    uint32_t puback_sent_ms;          // 上次发送该PUBLISH的时间
+    uint16_t puback_frame_len;        // 上次打包的PUBLISH帧长度（tx_buf里）
+    uint8_t  puback_retry_count;      // 重发次数
+
 
     int last_event_code;					//上次接收事件的事件代码，主要用于调试，被使用在input函数里面
 }MQTT_SESSION;
@@ -210,8 +269,8 @@ typedef struct{
     MQTT_Buffers    io;					    //缓冲区结构体
     MQTT_SESSION    ses;				    //会话状态结构体
     MQTT_Keepalive  ka;			            //保活机制结构体
-    MQTT_Callbacks  callbacks;              // 回调函数集合
-    MQTT_Platform   platform;               // 平台相关函数集合
+    MQTT_Callbacks  callbacks;              //回调函数集合
+    MQTT_Platform   platform;               //平台相关函数集合
 }MQTT_TCB;
 
 

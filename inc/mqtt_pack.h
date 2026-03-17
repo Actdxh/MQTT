@@ -13,5 +13,6 @@ int mqtt_pack_publish(MQTT_TCB* m,uint8_t* out,uint16_t out_size,const char* top
 int mqtt_pack_publish_two(MQTT_TCB* m,uint8_t* out,uint16_t out_size, mqtt_publish_params_t *params);
 void mqtt_pack_puback(MQTT_TCB* m, uint16_t messageid);
 void mqtt_pack_pingreq(MQTT_TCB* m);
+void mqtt_pack_disconnect(MQTT_TCB* m);
 
 #endif // !__MQTT_PACK_H

@@ -9,6 +9,8 @@
 
 
 
+
+
 int MQTT_Init(MQTT_TCB *m, const MQTT_config_t *config)
 {
 	if(m == NULL || config == NULL) {
@@ -43,6 +45,8 @@ int MQTT_Init(MQTT_TCB *m, const MQTT_config_t *config)
 	//m->length.topic_len = strlen(m->topic);
 	m->ses.next_pid = 1;
 	m->io.rx_buf_len = 0;
+	m->ses.tx_pending = 0;
+	m->ses.puback_outstanding = 0;
 
 	return 0;
 }
@@ -128,8 +132,107 @@ int MQTT_InputBytes(MQTT_TCB* m, const uint8_t* data, uint32_t len)
 			m->io.rx_buf_len -= frame_len;
 			frames++;
 		}
+		if(res > 0) {
+			m->ka.last_rx_ms = mqtt_now_ms(m); // 更新最后接收时间用于保活
+		}
 	}
 	return frames; // 返回处理的帧数
+}
+
+int mqtt_now_ms(MQTT_TCB* m)
+{
+	if(m == NULL || m->platform.now_ms == NULL) {
+		return -1; // Invalid MQTT control block or now_ms function not set
+	}
+	return m->platform.now_ms(m->platform.now_ms_ctx);
+}
+
+int MQTT_Process(MQTT_TCB* m)
+{
+	if(m == NULL) {
+		return -1; // Invalid MQTT control block
+	}
+	int bitmask = 0;
+	int res = Mqtt_PingProcess(m);
+	if(res < 0) {
+		return res; // Ping process resulted in an error
+	}
+	if(res == MQTT_PROCESS_PING_SENT) {
+		// 如果发送了 PING 请求，可以在这里设置一个标志位，方便在主循环中调试
+		bitmask |= MQTT_PING_RETRY_DEMO_BITMASK;
+	}
+	res = Mqtt_puback_retry_process(m);
+	if(res < 0) {
+		return res; // PUBACK retry process resulted in an error
+	}
+	if(res == MQTT_PROCESS_PUBACK_RETRY) {
+		// 如果重发了 PUBACK，可以在这里设置一个标志位，方便在主循环中调试
+		bitmask |= MQTT_PUBACK_RETRY_DEMO_BITMASK;
+	}
+	return bitmask; // 没有需要处理的事件
+}
+
+int Mqtt_puback_retry_process(MQTT_TCB* m)
+{
+	if(m == NULL) {
+		return MQTT_ERR_ARG; // Invalid MQTT control block
+	}
+	if(m->ses.puback_outstanding == 1) {
+		if(m->platform.now_ms == NULL) {
+			return MQTT_ERR_NO_TIME; // No time function, cannot process PUBACK retry
+		}
+		uint32_t now = mqtt_now_ms(m);
+		if((now - m->ses.puback_sent_ms >= m->param.puback_timeout_ms))
+		{
+			if(m->ses.puback_retry_count < 3) {
+			m->io.publish_buf[0] |= 0x08; // 设置 DUP 标志重发 
+			m->ses.tx_pending |= MQTT_PENDING_PUBLISH_QOS1;
+			mqtt_emit_send(m); // 重发 PUBLISH 包
+			m->ses.puback_sent_ms = now;
+			m->ses.puback_retry_count++;
+			return MQTT_PROCESS_PUBACK_RETRY; // 已重发 PUBACK
+			} else if(m->ses.puback_retry_count >= 3) {
+				m->ses.puback_outstanding = 0; // 超过重试次数后放弃，重置状态
+				m->ses.puback_pid = 0;
+				m->ses.puback_sent_ms = 0;
+				m->ses.puback_retry_count = 0;
+				m->ses.puback_frame_len = 0;
+				return MQTT_ERR_TIMEOUT; // PUBACK 重试超时
+			}
+		}
+	}
+	return MQTT_PROCESS_NONE;
+}
+
+int Mqtt_PingProcess(MQTT_TCB* m)
+{
+	if(m == NULL) {
+		return MQTT_ERR_ARG; // Invalid MQTT control block
+	}
+	if(m->ka.keepalive_ms == 0) {
+		return MQTT_PROCESS_NONE;//不自动重连
+	}
+	if(m->platform.now_ms == NULL) {
+		return MQTT_ERR_NO_TIME;// No time function, cannot process keepalive
+	}
+	uint32_t now = mqtt_now_ms(m);
+	uint32_t last_activity_ms = m->ka.last_rx_ms > m->ka.last_tx_ms ? m->ka.last_rx_ms : m->ka.last_tx_ms;
+	if(last_activity_ms == 0) {
+		m->ka.last_rx_ms = now; // 如果从未有过活动，使用当前时间作为基准
+		m->ka.last_tx_ms = now;
+	}
+	if((!m->ka.ping_outstanding) && (now - last_activity_ms >= m->ka.keepalive_ms)) {
+		mqtt_pack_pingreq(m);
+		mqtt_emit_send(m);
+		m->ka.last_pingreq_ms = now;
+		m->ka.ping_outstanding = 1;
+		return MQTT_PROCESS_PING_SENT; // 已发送 Ping 请求
+	}
+	if((m->ka.ping_outstanding) && (now - m->ka.last_pingreq_ms >= m->ka.ping_timeout_ms)) {
+		m->ka.ping_outstanding = 0; // 超时后重置 ping 状态，等待下一次发送
+		return MQTT_ERR_TIMEOUT; // Ping 请求超时
+	}
+	return	MQTT_PROCESS_NONE; 
 }
 
 void MQTT_SetAllOnCb_same(MQTT_TCB* m, const MQTT_Callbacks *cb)
@@ -211,7 +314,25 @@ void MQTT_SetOnPuback(MQTT_TCB* m, mqtt_on_puback_cb cb, void* user_ctx)
 	m->callbacks.on_puback_ctx = user_ctx;
 }
 
-void mqtt_emit_send(MQTT_TCB* m)
+void MQTT_SetNowMs(MQTT_TCB* m, mqtt_now_ms_fn now_ms, void* user_ctx)
+{
+	if(m == NULL) {
+		return; // Invalid MQTT control block
+	}
+	m->platform.now_ms = now_ms;
+	m->platform.now_ms_ctx = user_ctx;
+}
+
+void Mqtt_SetKeepalive(MQTT_TCB* m, uint16_t keepalive_ms, uint16_t ping_timeout_ms)
+{
+	if(m == NULL) {
+		return; // Invalid MQTT control block
+	}
+	m->ka.keepalive_ms = keepalive_ms;
+	m->ka.ping_timeout_ms = ping_timeout_ms;
+}
+
+void mqtt_emit_send_buf(MQTT_TCB* m, const uint8_t* data, uint16_t len)
 {
 	if(m == NULL) {
 		return; // Invalid MQTT control block
@@ -219,8 +340,63 @@ void mqtt_emit_send(MQTT_TCB* m)
 	if (m->callbacks.on_send == NULL) {
 		return; // No send callback registered
 	}
-    if (m->callbacks.on_send && m->length.Totallength > 0) {
-		m->callbacks.on_send(m->callbacks.on_send_ctx, m->io.tx_buf, (uint16_t)m->length.Totallength);
+	if(data == NULL || len == 0) {
+		return; // No data to send
+	}
+    if (m->callbacks.on_send) {
+		m->callbacks.on_send(m->callbacks.on_send_ctx, data, len);
     }
+	{
+		int now = mqtt_now_ms(m);
+		//获取当前时间用于保活
+		m->ka.last_tx_ms = now;
+
+		//获取当前时间确认要不要去重发publish包
+		if((m->ses.puback_outstanding) && (m->ses.puback_sent_ms == 0)) {//确认是发送的publsih
+			m->ses.puback_sent_ms = now;
+		}
+
+	}
+	
+}
+
+void mqtt_emit_send(MQTT_TCB* m)
+{
+	if(m == NULL) {
+		return; // Invalid MQTT control block
+	}
+	if(m->ses.tx_pending & (0xffff &~MQTT_PENDING_PUBACK)) {
+		m->ses.tx_pending &= ~MQTT_PENDING_PINGREQ;
+	}
+	if(m->ses.tx_pending == 0) {
+
+	}else if(m->ses.tx_pending & MQTT_PENDING_CONNECT) {
+		mqtt_emit_send_buf(m, m->io.connect_buf, m->length.pack_len.connect_buf_len);
+		m->ses.tx_pending &= ~MQTT_PENDING_CONNECT; // 发送后清除待发送标志
+	}else if(m->ses.tx_pending & MQTT_PENDING_PUBACK) {
+		mqtt_emit_send_buf(m, m->io.puback_buf, m->length.pack_len.puback_buf_len);
+		m->ses.tx_pending &= ~MQTT_PENDING_PUBACK;
+	}else if(m->ses.tx_pending & MQTT_PENDING_PUBLISH_QOS0) {
+		mqtt_emit_send_buf(m, m->io.publish_buf, m->length.pack_len.publish_buf_len);
+		m->ses.tx_pending &= ~MQTT_PENDING_PUBLISH_QOS0;
+	}else if(m->ses.tx_pending & MQTT_PENDING_PUBLISH_QOS1) {
+		mqtt_emit_send_buf(m, m->io.publish_buf, m->length.pack_len.publish_buf_len);
+		m->ses.tx_pending &= ~MQTT_PENDING_PUBLISH_QOS1;
+	}else if(m->ses.tx_pending & MQTT_PENDING_SUBSCRIBE) {
+		mqtt_emit_send_buf(m, m->io.subscribe_buf, m->length.pack_len.subscribe_buf_len);
+		m->ses.tx_pending &= ~MQTT_PENDING_SUBSCRIBE;
+	}else if(m->ses.tx_pending & MQTT_PENDING_UNSUBSCRIBE) {
+		mqtt_emit_send_buf(m, m->io.unsubscribe_buf, m->length.pack_len.unsubscribe_buf_len);
+		m->ses.tx_pending &= ~MQTT_PENDING_UNSUBSCRIBE;
+	}else if(m->ses.tx_pending & MQTT_PENDING_DISCONNECT) {
+		mqtt_emit_send_buf(m, m->io.disconnect_buf, m->length.pack_len.disconnect_buf_len);
+		m->ses.tx_pending &= ~MQTT_PENDING_DISCONNECT;
+	}else if(m->ses.tx_pending & MQTT_PENDING_PINGREQ) {
+		mqtt_emit_send_buf(m, m->io.pingreq_buf, m->length.pack_len.pingreq_buf_len);
+		m->ses.tx_pending &= ~MQTT_PENDING_PINGREQ;
+	}
+	
+
+
 }
 

@@ -13,6 +13,7 @@ void my_on_suback(void* user_ctx, const mqtt_suback_view_t* v);
 void my_on_unsuback(void* user_ctx, const mqtt_unsuback_view_t* v);
 void my_on_pingresp(void* user_ctx);
 void my_on_puback(void* user_ctx, const mqtt_puback_view_t* v);
+
 /*--------------------调试打印功能函数-------------------------*/
 const char* MQTT_RxEventStr(int code);
 

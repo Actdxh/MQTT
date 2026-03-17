@@ -120,6 +120,7 @@ int mqtt_pack_connect(MQTT_TCB*m, uint8_t* out, uint16_t out_size, uint16_t keep
 	m->length.Load_len = Load_len;
 	m->length.Remaining_len = Remaining_len;
 	m->length.Totallength = Totallength;
+	m->ses.tx_pending |= MQTT_PENDING_CONNECT; // Mark CONNECT as pending for transmission
 
 	return m->length.Totallength; // Return the total length of the packed MQTT CONNECT message
 }
@@ -188,6 +189,7 @@ int mqtt_pack_subscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const char
 	m->length.Load_len = Load_len;
 	m->length.Remaining_len = Remaining_len;
 	m->length.Totallength = Totallength;
+	m->ses.tx_pending |= MQTT_PENDING_SUBSCRIBE; // Mark SUBSCRIBE as pending for transmission
 	
 	return Totallength;
 }
@@ -247,6 +249,7 @@ int mqtt_pack_unsubscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const ch
 	m->length.Load_len = Load_len;
 	m->length.Remaining_len = Remaining_len;
 	m->length.Totallength = Totallength;
+	m->ses.tx_pending |= MQTT_PENDING_UNSUBSCRIBE; // Mark UNSUBSCRIBE as pending for transmission
 
 	return Totallength;
 }
@@ -334,6 +337,20 @@ int mqtt_pack_publish(
 	m->length.Remaining_len = Remaining_len;
 	m->length.Totallength = Totallength;
 
+	if(qos == 1) {
+		m->ses.puback_outstanding = 1;
+		m->ses.puback_pid = m->ses.last_publish_pid;
+		m->ses.puback_frame_len = Totallength;
+		m->ses.puback_retry_count = 0;
+	}
+	if(qos == 1) {
+		m->ses.tx_pending |= MQTT_PENDING_PUBLISH_QOS1; // Mark PUBLISH as pending for transmission
+	}else if(qos == 0)
+	{
+		m->ses.tx_pending |= MQTT_PENDING_PUBLISH_QOS0; // Mark PUBLISH as pending for transmission
+	}
+	
+
 	return Totallength;
 }
 
@@ -348,18 +365,28 @@ int mqtt_pack_publish_two(MQTT_TCB* m,uint8_t* out,uint16_t out_size, mqtt_publi
 
 void mqtt_pack_puback(MQTT_TCB* m, uint16_t messageid)
 {
-	m->io.tx_buf[0] = 0x40;
-	m->io.tx_buf[1] = 0x02;
-	m->io.tx_buf[2] = messageid/256;
-	m->io.tx_buf[3] = messageid%256;
+	m->io.puback_buf[0] = 0x40;
+	m->io.puback_buf[1] = 0x02;
+	m->io.puback_buf[2] = messageid/256;
+	m->io.puback_buf[3] = messageid%256;
 	
-	m->length.Totallength = 4;
+	m->ses.tx_pending |= MQTT_PENDING_PUBACK; // Mark PUBACK as pending for transmission
+
+	m->length.pack_len.puback_buf_len = 4;
 }
 
 void mqtt_pack_pingreq(MQTT_TCB* m)
 {
-	m->io.tx_buf[0] = 0xC0; // PINGREQ 固定报头
-	m->io.tx_buf[1] = 0x00; // 剩余长度为0
-	m->length.Totallength = 2;
+	m->io.pingreq_buf[0] = 0xC0; // PINGREQ 固定报头
+	m->io.pingreq_buf[1] = 0x00; // 剩余长度为0
+	m->ses.tx_pending |= MQTT_PENDING_PINGREQ; // Mark PINGREQ as pending for transmission
+	m->length.pack_len.pingreq_buf_len = 2;
 }
 
+void mqtt_pack_disconnect(MQTT_TCB* m)
+{
+	m->io.disconnect_buf[0] = 0xE0; // DISCONNECT 固定报头
+	m->io.disconnect_buf[1] = 0x00; // 剩余长度为0
+	m->ses.tx_pending |= MQTT_PENDING_DISCONNECT; // Mark DISCONNECT as pending for transmission
+	m->length.pack_len.disconnect_buf_len = 2;
+}
