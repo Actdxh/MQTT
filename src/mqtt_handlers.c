@@ -64,6 +64,16 @@ int mqtt_handle_connack(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 	if(m->callbacks.on_connack) {
 		m->callbacks.on_connack(m->callbacks.on_connack_ctx, &view);//需要注意的是这个回调是在return之前，所以就算是错的也要考虑
 	}
+	if(view.return_code == 0) {
+		m->ses.conn_state = MQTT_CONN_CONNECTED;
+	} else {
+		m->ses.conn_state = MQTT_CONN_DISCONNECTED;
+	}
+	if(m->ses.sub_cache.valid && view.return_code == 0) {
+		// 如果之前有订阅缓存且连接成功，尝试重新订阅
+		mqtt_pack_subscribe(m, m->io.subscribe_buf, MQTT_SUBSCRIBE_BUF_SIZE, m->ses.sub_cache.topic, m->ses.sub_cache.qos);
+		mqtt_emit_send(m);
+	}
 	//这里可以考虑加回调
 	return MQTT_RX_CONNACK; // 处理了 CONNACK 包
 }
@@ -89,6 +99,7 @@ int mqtt_handle_suback(MQTT_TCB* m, const uint8_t* rx, uint32_t rx_len)
 	if(m->callbacks.on_suback) {
 		m->callbacks.on_suback(m->callbacks.on_suback_ctx, &view);
 	}
+	m->ses.sub_cache.valid = 1;
 	return MQTT_RX_SUBACK; // 处理了 SUBACK 包
 }
 

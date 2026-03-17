@@ -7,6 +7,7 @@
 #define BUFF_SIZE 256
 #define MQTT_TXBUF_SIZE 1024
 
+
 #ifndef MQTT_RXBUF_SIZE
 #define MQTT_RXBUF_SIZE 1024
 #endif
@@ -19,7 +20,7 @@
 #define MQTT_PUBACK_BUF_SIZE 256
 #define MQTT_DISCONNECT_BUF_SIZE 256
 
-
+#define MQTT_SUB_CACHE_TOPIC_SIZE 64//缓存用于reconnect后sub的话题
 
 typedef enum {
     MQTT_CONN_DISCONNECTED = 0,
@@ -65,6 +66,7 @@ typedef enum {
     MQTT_ERR_NO_TIME            = -6, // 没有获取当前时间的函数，无法处理超时相关功能
     MQTT_ERR_TIMEOUT            = -7, // 超时
     MQTT_ERR_SEND_INCOMPLETE    = -8, // 发送数据不完整，可能需要重试
+    MQTT_ERR_NEED_RECONNECT     = -9, // 需要重新连接，例如在保活机制中连续多次 PING 请求超时后
 } mqtt_err_t;
 
 typedef enum{
@@ -85,6 +87,11 @@ typedef enum{
     MQTT_PENDING_PINGREQ        = (1u << 7),  
 }mqtt_pending_bits_t;
 
+typedef struct {
+    uint8_t  valid;
+    uint8_t  qos;
+    char     topic[MQTT_SUB_CACHE_TOPIC_SIZE];
+} mqtt_sub_cache_t;
 
 typedef struct 
 {
@@ -230,7 +237,7 @@ typedef struct
 typedef struct{
     //packet ids
     uint32_t tx_pending;
-
+    
     uint16_t next_pid;
     uint16_t last_subscribe_pid;
     uint16_t last_publish_pid;
@@ -246,7 +253,8 @@ typedef struct{
     uint16_t puback_frame_len;        // 上次打包的PUBLISH帧长度（tx_buf里）
     uint8_t  puback_retry_count;      // 重发次数
 
-
+    mqtt_conn_state_t conn_state;			//连接状态
+    mqtt_sub_cache_t sub_cache; // 订阅缓存，用于记录已订阅的主题和 QoS，方便重连后恢复订阅状态
     int last_event_code;					//上次接收事件的事件代码，主要用于调试，被使用在input函数里面
 }MQTT_SESSION;
 

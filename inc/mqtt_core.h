@@ -13,8 +13,7 @@ int MQTT_InputBytes(MQTT_TCB* m, const uint8_t* data, uint32_t len);
 int MQTT_OnRx(MQTT_TCB* m, const uint8_t* rx_data, uint32_t rx_len);
 int mqtt_now_ms(MQTT_TCB* m);
 int MQTT_Process(MQTT_TCB* m);
-int Mqtt_puback_retry_process(MQTT_TCB* m);
-int Mqtt_PingProcess(MQTT_TCB* m);
+int MQTT_ReconnectReset(MQTT_TCB* m); // 连接重置函数，清除会话状态和重试计数器，准备重新连接
 /*--------------------回调函数的注册函数-------------------------*/
 void MQTT_SetAllOnCb_same(MQTT_TCB* m, const MQTT_Callbacks *cb);
 void MQTT_SetOnConnack(MQTT_TCB* m, mqtt_on_connack_cb cb, void* user_ctx);
@@ -28,11 +27,12 @@ void MQTT_SetOnPuback(MQTT_TCB* m, mqtt_on_puback_cb cb, void* user_ctx);
 void MQTT_SetNowMs(MQTT_TCB* m, mqtt_now_ms_fn now_ms, void* user_ctx);
 void Mqtt_SetKeepalive(MQTT_TCB* m, uint16_t keepalive_ms, uint16_t ping_timeout_ms);
 /*--------------------封装的功能函数-------------------------*/
-int mqtt_emit_send_buf(MQTT_TCB* m, const uint8_t* data, uint16_t len);
 int mqtt_emit_send(MQTT_TCB* m);
 
-
-
+/*--------------------内部使用的函数-------------------------*/
+int Mqtt_puback_retry_process(MQTT_TCB* m);
+int Mqtt_PingProcess(MQTT_TCB* m);
+int mqtt_emit_send_buf(MQTT_TCB* m, const uint8_t* data, uint16_t len);
 
 
 #endif // !__MQTT_CORE_H

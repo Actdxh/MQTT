@@ -147,20 +147,46 @@ int mqtt_now_ms(MQTT_TCB* m)
 	return m->platform.now_ms(m->platform.now_ms_ctx);
 }
 
+int MQTT_ReconnectReset(MQTT_TCB* m)
+{
+	if(m == NULL) {	
+		return 	MQTT_ERR_ARG; // Invalid MQTT control block
+	}
+	m->ses.tx_pending = 0;
+	m->ses.puback_outstanding = 0;
+	m->ses.puback_pid = 0;
+	m->ses.puback_sent_ms = 0;
+	m->ses.puback_retry_count = 0;
+	m->ses.puback_frame_len = 0;
+	m->ka.last_tx_ms = 0;
+	m->ka.last_rx_ms = 0;
+	m->ka.last_pingreq_ms = 0;
+	m->ka.ping_outstanding = 0;
+
+	int now = mqtt_now_ms(m);
+	if(now >= 0) {
+		m->ka.last_tx_ms = now;
+		m->ka.last_rx_ms = now;
+	}
+	m->io.rx_buf_len = 0; // 清空接收缓冲区，丢弃未处理的数据
+	
+	return 0; // Reconnect reset successful
+}
+
 int MQTT_Process(MQTT_TCB* m)
 {
 	if(m == NULL) {
         return MQTT_ERR_ARG;
     }
 
-    int res = Mqtt_PingProcess(m);
-    if(res < 0) {
-        return res; // timeout/no_time/...
-    }
-
-    res = Mqtt_puback_retry_process(m);
+	int res = Mqtt_puback_retry_process(m);
     if(res < 0) {
         return res;
+    }
+
+    res = Mqtt_PingProcess(m);
+    if(res < 0) {
+        return res; // timeout/no_time/...
     }
 	
     return 0;
@@ -191,7 +217,7 @@ int Mqtt_puback_retry_process(MQTT_TCB* m)
 				m->ses.puback_sent_ms = 0;
 				m->ses.puback_retry_count = 0;
 				m->ses.puback_frame_len = 0;
-				return MQTT_ERR_TIMEOUT; // PUBACK 重试超时
+				return MQTT_ERR_NEED_RECONNECT; // PUBACK 重试超时
 			}
 		}
 	}
@@ -224,7 +250,7 @@ int Mqtt_PingProcess(MQTT_TCB* m)
 	}
 	if((m->ka.ping_outstanding) && (now - m->ka.last_pingreq_ms >= m->ka.ping_timeout_ms)) {
 		m->ka.ping_outstanding = 0; // 超时后重置 ping 状态，等待下一次发送
-		return MQTT_ERR_TIMEOUT; // Ping 请求超时
+		return MQTT_ERR_NEED_RECONNECT; // Ping 请求超时
 	}
 	return	MQTT_PROCESS_NONE; 
 }
@@ -341,7 +367,7 @@ int mqtt_emit_send_buf(MQTT_TCB* m, const uint8_t* data, uint16_t len)
 		#endif
 		return rc; // Send callback returned an error
 	}
-	if(rc != len) {
+	if((uint16_t)rc != len) {
 		return MQTT_ERR_SEND_INCOMPLETE; // Send callback did not send all data
 	}
 	uint32_t now = mqtt_now_ms(m);
@@ -370,7 +396,7 @@ int mqtt_emit_send(MQTT_TCB* m)
 		// #endif
 		return MQTT_ERR_ARG; // Invalid MQTT control block
 	}
-	if(m->ses.tx_pending & ((uint32_t) (0xfffffff &~MQTT_PENDING_PUBACK))) {
+	if(m->ses.tx_pending & ((uint32_t) (0xfffffff &~MQTT_PENDING_PINGREQ))) {
 		m->ses.tx_pending &= ~MQTT_PENDING_PINGREQ;
 	}
 	int rc;

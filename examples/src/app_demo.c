@@ -94,6 +94,315 @@ void app_demo(void)
                     .on_publish = my_on_publish,
                     .on_publish_ctx = &g_demo_ctx,
                     .on_send = my_on_send,
+                    .on_send_ctx = &MqttA, // 发送回调不需要用户上下文
+                    .on_suback = my_on_suback,
+                    .on_suback_ctx = &g_demo_ctx,
+                    .on_unsuback = my_on_unsuback,
+                    .on_unsuback_ctx = &g_demo_ctx,
+                    .on_pingresp = my_on_pingresp,
+                    .on_pingresp_ctx = &g_demo_ctx,
+                    .on_puback = my_on_puback,
+                    .on_puback_ctx = &g_demo_ctx,
+                }); // 注册回调函数
+                MQTT_SetNowMs(&MqttA, my_now_ms, &g_clock); // 设置当前时间函数
+                Mqtt_SetKeepalive(&MqttA, 10000, 2000); // 设置保活间隔为 10 秒，PING 超时为 2 秒
+            }
+                break;
+            case ST_SEND_CONNECT:{
+                connack_wait_guard = 0;
+                mqtt_pack_connect(&MqttA, MqttA.io.connect_buf, MQTT_CONNECT_BUF_SIZE, 10000);
+                mqtt_emit_send(&MqttA);
+                #ifdef MQTT_DEMO_DEBUG
+                printf("MQTT CONNECT message sent\r\n");
+                #endif // DEBUG
+                st = ST_WAIT_CONNACK;
+            }
+                break;
+            // case ST_FEED_CONNACK:{
+            //     feed_data(&MqttA, "20 02 00 00"); // 模拟服务器返回 CONNACK 包，表示连接成功
+            //     st = ST_WAIT_CONNACK; // 等待连接确认事件
+            // }
+            //     break;
+            case ST_WAIT_CONNACK:{
+                connack_wait_guard ++;
+                if(connack_wait_guard > 100) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Waiting for CONNACK timeout!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 超时未收到 CONNACK，进入错误状态
+                    break;
+                }
+                app_evt_t e;
+                int res = app_evt_pop(&g_demo_ctx, &e);
+                if(res == 0) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Waiting for CONNACK...\r\n");
+                    #endif // DEBUG
+                    st = ST_WAIT_CONNACK; // 继续等待连接确认事件
+                    break;
+                }else if(res < 0) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Error while waiting for CONNACK!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 等待事件时发生错误，进入错误状态
+                    break;
+                }else if(e.type == APP_EVT_CONNACK_OK) {
+                    st = ST_SEND_SUBSCRIBE; // 连接成功，进入下一步
+                }else if(e.type == APP_EVT_CONNACK_FAIL) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Connection failed, rc = %u\r\n", (unsigned)MqttA.ses.connack_rc);
+                    #endif // DEBUG
+                    st = ST_ERROR; // 连接失败，进入错误状态
+                }
+            }
+                break;
+            case ST_SEND_SUBSCRIBE:{
+                suback_wait_guard = 0;
+                mqtt_pack_subscribe(&MqttA, MqttA.io.subscribe_buf, MQTT_SUBSCRIBE_BUF_SIZE, "TOPIC001", 0);
+                mqtt_emit_send(&MqttA);
+                st = ST_WAIT_SUBACK;
+            }
+                break;
+            // case ST_FEED_SUBACK:{
+            //     uint16_t pid = MqttA.ses.last_subscribe_pid; // 获取刚才发送的 SUBSCRIBE 报文的 Packet ID
+            //     uint8_t pid_high = (pid >> 8) & 0xFF;
+            //     uint8_t pid_low = pid & 0xFF;
+            //     char suback_hex[32];
+            //     snprintf(suback_hex, sizeof(suback_hex), "90 03 %02X %02X 00", pid_high, pid_low);
+            //     feed_data(&MqttA, suback_hex); // 模拟服务器返回 SUBACK 包，表示订阅成功
+            //     st = ST_WAIT_SUBACK; // 等待订阅确认事件
+            // }
+            //     break;
+            case ST_WAIT_SUBACK:{
+                suback_wait_guard++;
+                if(suback_wait_guard > 100) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Waiting for SUBACK timeout!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 超时未收到 SUBACK，进入错误状态
+                    break;
+                }
+                app_evt_t e;
+                int res = app_evt_pop(&g_demo_ctx, &e);
+                if(res == 0) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Waiting for SUBACK...\r\n");
+                    #endif // DEBUG
+                    st = ST_WAIT_SUBACK; // 继续等待订阅确认事件
+                    break;
+                }else if(res < 0) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Error while waiting for SUBACK!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 等待事件时发生错误，进入错误状态
+                    break;
+                }else if(e.type == APP_EVT_SUBACK_OK) {
+                    st = ST_SEND_PUBLISH1; // 订阅成功，进入下一步
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Subscription successful\r\n");
+                    #endif // DEBUG
+                } else if(e.type == APP_EVT_SUBACK_FAIL) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Subscription failed\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 订阅失败，进入错误状态
+                }
+            }
+                break;
+            case ST_SEND_PUBLISH1:{
+                puback_wait_guard = 0; // 确保等待 PUBACK 的计数器被正确初始化
+                mqtt_publish_params_t params = {
+                    .topic = "TEST",
+                    .payload = "Hello MQTT",
+                    .payload_len = strlen("Hello MQTT"),
+                    .qos = 1,
+                    .retain = 0,
+                    .dup = 0
+                };
+                mqtt_pack_publish_two(&MqttA, MqttA.io.publish_buf, MQTT_PUBLISH_BUF_SIZE, &params);
+                mqtt_emit_send(&MqttA);
+                #ifdef MQTT_DEMO_DEBUG
+                printf("MQTT_NEW_PID: %u\r\n", MqttA.ses.last_publish_pid);
+                #endif // DEBUG
+                st = ST_WAIT_PUBACK;
+            }
+                break;
+            // case ST_FEED_PUBACK1:{
+            //     uint16_t pid = MqttA.ses.last_publish_pid; // 获取刚才发送的 PUBLISH 报文的 Packet ID
+            //     uint8_t pid_high = (pid >> 8) & 0xFF;
+            //     uint8_t pid_low = pid & 0xFF;
+            //     char puback_hex[32];
+            //     snprintf(puback_hex, sizeof(puback_hex), "40 02 %02X %02X", pid_high, pid_low);
+            //     feed_data(&MqttA, puback_hex); // 模拟服务器返回 PUBACK 包，表示已收到 QoS 1 的 PUBLISH 包
+            //     st = ST_WAIT_PUBACK; // 等待 PUBACK 事件
+            //     #ifdef MQTT_DEMO_DEBUG
+            //     printf("Waiting for PUBACK with PID: %u\r\n", pid);
+            //     #endif // DEBUG
+            // }
+                // break;
+            case ST_WAIT_PUBACK:{
+                app_evt_t e;
+                puback_wait_guard++;
+                if(puback_wait_guard > 100) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Waiting for PUBACK timeout!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 超时未收到 PUBACK，进入错误状态
+                    break;
+                }
+                int res = app_evt_pop(&g_demo_ctx, &e);
+                if(res == 0) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Waiting for PUBACK...\r\n");
+                    #endif // DEBUG
+                    st = ST_WAIT_PUBACK; // 继续等待 PUBACK 事件
+                    break;
+                }else if(res < 0){
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Error while waiting for PUBACK!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 等待事件时发生错误，进入错误状态
+                    break;
+                } else if(e.type == APP_EVT_PUBACK_OK && e.pid == MqttA.ses.last_publish_pid) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("PUBACK received for PID: %u\r\n", e.pid);
+                    #endif // DEBUG
+                    #ifdef MQTT_DEMO_KEEPALIVE_TEST
+                    st = ST_NONE; // 收到 PUBACK，回到等待状态，继续测试保活机制
+                    #else
+                    st = ST_SEND_PING; // 收到 PUBACK，进入下一步
+                    #endif // KEEPALIVE_TEST
+                }else{
+					#ifdef MQTT_DEMO_DEBUG
+                    if(puback_wait_guard % 10 == 0) { // 每10次打印一次
+                        printf("PUBACK EXPERT PID: %u, RECEIVED: %u\r\n", MqttA.ses.last_publish_pid, e.pid);
+                    }
+                    #endif // DEBUG
+                    st = ST_WAIT_PUBACK; // 继续等待 PUBACK 事件 
+                }
+            }
+                break;
+            #ifndef MQTT_DEMO_KEEPALIVE_TEST
+            case ST_SEND_PING:{
+                pingresp_wait_guard = 0; // 确保等待 PINGRESP 的计数器被正确初始化
+                mqtt_pack_pingreq(&MqttA);
+                mqtt_emit_send(&MqttA);
+                st = ST_WAIT_PINGRESP;
+            }
+                break;
+            // case ST_FEED_PINGRESP:{//这个是模拟服务器返回 PINGRESP 包，表示服务器响应了 PING 请求
+            //     feed_data(&MqttA, "D0 00"); // 模拟服务器返回 PINGRESP 包，表示服务器响应了 PING 请求
+            //     st = ST_WAIT_PINGRESP; // 等待 PINGRESP 事件
+            // }
+            //     break;
+            case ST_WAIT_PINGRESP:{
+                pingresp_wait_guard++;
+                if(pingresp_wait_guard > 100) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Waiting for PINGRESP timeout!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 超时未收到 PINGRESP，进入错误状态
+                }
+                app_evt_t e;
+                int res = app_evt_pop(&g_demo_ctx, &e);
+                if(res == 0) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Waiting for PINGRESP...\r\n");
+                    #endif // DEBUG
+                    st = ST_WAIT_PINGRESP; // 继续等待 PINGRESP 事件
+                    break;
+                }else if (res < 0)
+                {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("Error while waiting for PINGRESP!\r\n");
+                    #endif // DEBUG
+                    st = ST_ERROR; // 等待事件时发生错误，进入错误状态
+                    break;
+                } else if(e.type == APP_EVT_PINGRESP) {
+                    #ifdef MQTT_DEMO_DEBUG
+                    printf("PINGRESP received!\r\n");
+                    #endif // DEBUG
+                    #ifdef MQTT_DEMO_KEEPALIVE_TEST
+                    st = ST_NONE; // 收到 PINGRESP，回到等待状态，继续测试保活机制
+                    #else
+                    st = ST_DONE; // 收到 PINGRESP，进入完成状态
+                    #endif // KEEPALIVE_TEST 
+                }else 
+                {
+                    #ifdef MQTT_DEMO_DEBUG
+                    if(pingresp_wait_guard % 10 == 0) { // 每10次打印一次
+                       printf("PINGRESP not received yet!\r\n");
+                    }
+                    #endif // DEBUG
+                    st = ST_WAIT_PINGRESP; // 继续等待 PINGRESP 事件 
+                }
+            }
+                break;
+            #endif
+            default:
+                #ifdef MQTT_DEMO_KEEPALIVE_TEST
+                st = ST_NONE;
+                #else
+                st = ST_ERROR; // 未知状态，进入错误状态
+                #endif // DEBUG
+                
+                break;
+                 
+        }
+        delay_ms(&g_clock, 100); // 模拟一些处理时间，避免过快循环
+        int rrc = MQTT_Process(&MqttA);
+        if(rrc == MQTT_ERR_NEED_RECONNECT) {
+            #ifdef MQTT_DEMO_DEBUG
+            printf("Need to reconnect!\r\n");
+            #endif // DEBUG
+            st = ST_SEND_CONNECT;
+            //close(sock);
+            //sock = reconnect();
+            MQTT_ReconnectReset(&MqttA); // 重置 MQTT 状态以准备重新连接
+        }
+    }
+
+    if(st == ST_DONE) {
+        printf("app_demo status: DONE\r\n");
+    } else {
+        printf("app_demo status: ERROR\r\n");
+    }
+    
+}
+
+//这个函数是一个主要使用状态机演示的的demo,这是我已经验证完成了的版本，但是为了实现其他的功能，我把
+//打算吧feed加到send后面，也就是状态机少了几个状态，最后的使用bitmask的也被我改了，return的不是bitmask
+//而是把超时返回改成了重连，所以不能直接使用了，我改了很多其他的内部函数
+void app_demo1(void)
+{
+    MQTT_TCB MqttA;
+    app_demo_state_t st = ST_INIT;
+    int guard = 0; // 用于防止死循环的简单计数器
+    while(st != ST_DONE && st != ST_ERROR) {
+        #ifndef MQTT_DEMO_KEEPALIVE_TEST
+        if(++guard > 1000)
+        {
+            printf("app_demo: guard break!\r\n");
+            st = ST_ERROR;
+            break;
+        }
+        #endif // !MQTT_DEMO_KEEPALIVE_TEST
+        switch (st)
+        {
+            case ST_INIT:{
+                if(app_demo_init(&MqttA) < 0)
+                {
+                    st = ST_ERROR;
+                } else {
+                    st = ST_SEND_CONNECT;
+                }
+                app_ctx_init(&g_demo_ctx); // 初始化应用事件队列
+                MQTT_SetAllOnCb_same(&MqttA, &(MQTT_Callbacks){
+                    .on_connack = my_on_connack,
+                    .on_connack_ctx = &g_demo_ctx,
+                    .on_publish = my_on_publish,
+                    .on_publish_ctx = &g_demo_ctx,
+                    .on_send = my_on_send,
                     .on_send_ctx = NULL, // 发送回调不需要用户上下文
                     .on_suback = my_on_suback,
                     .on_suback_ctx = &g_demo_ctx,

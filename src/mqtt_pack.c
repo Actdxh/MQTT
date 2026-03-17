@@ -191,6 +191,10 @@ int mqtt_pack_subscribe(MQTT_TCB *m, uint8_t* out, uint16_t out_size, const char
 	m->length.Totallength = Totallength;
 	m->ses.tx_pending |= MQTT_PENDING_SUBSCRIBE; // Mark SUBSCRIBE as pending for transmission
 	m->length.pack_len.subscribe_buf_len = Totallength;
+
+	m->ses.sub_cache.qos = qos;
+	strncpy(m->ses.sub_cache.topic, topic, MQTT_SUB_CACHE_TOPIC_SIZE - 1);
+	m->ses.sub_cache.topic[MQTT_SUB_CACHE_TOPIC_SIZE - 1] = '\0'; // Ensure null-termination
 	return Totallength;
 }
 

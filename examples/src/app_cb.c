@@ -54,21 +54,86 @@ void my_on_publish(void* user_ctx, const mqtt_publish_view_t* msg)
 	// 这里可以添加其他处理接收到的 PUBLISH 消息的逻辑，例如打印消息内容等
 };
 
+static void hex_feed_puback(MQTT_TCB* m, uint16_t pid)
+{
+    char hex[32];
+    snprintf(hex, sizeof(hex), "40 02 %02X %02X", (pid >> 8) & 0xFF, pid & 0xFF);
+    feed_data(m, hex);
+}
+
+static void hex_feed_suback(MQTT_TCB* m, uint16_t pid)
+{
+    char hex[32];
+    snprintf(hex, sizeof(hex), "90 03 %02X %02X 00", (pid >> 8) & 0xFF, pid & 0xFF);
+    feed_data(m, hex);
+}
+
 int my_on_send(void* user_ctx, const uint8_t* data, uint16_t len)
 {
-	//不判断user_ctx因为这是作为一个可选字段，以后业务层的时候自定义其他作用
-	if(!data || len == 0) {
-		return; // 无效的用户上下文
-	}
-	uint16_t i; 
-    (void)user_ctx;
+    MQTT_TCB* m = (MQTT_TCB*)user_ctx; // 关键：让 demo 能 feed 自己
+    if(!m || !data || len < 2) return MQTT_ERR_ARG;
 
+    // 打印
+    uint16_t i; 
     printf("TX %u bytes: ", (unsigned)len);
-    for (i = 0; i < len; i++) {
-        printf("%02X ", data[i]);
-    }
+    for(i = 0; i < len; i++) printf("%02X ", data[i]);
     printf("\r\n");
-};
+
+    // 解析固定头：type + remaining length
+    uint8_t type = data[0] & 0xF0;
+
+    uint32_t rem_len = 0;
+    uint8_t rem_len_bytes = 0;
+    int rr = mqtt_read_rem_len(data + 1, (uint32_t)(len - 1), &rem_len, &rem_len_bytes);
+    if(rr < 0) return (int)len; // demo里不苛刻，认为发成功
+
+    const uint8_t* vh = data + 1 + rem_len_bytes; // variable header 起点
+
+    if(type == 0x10) {
+        // CONNECT -> CONNACK OK
+        feed_data(m, "20 02 00 00");
+    } else if(type == 0x80) {
+        // SUBSCRIBE (0x82) / UNSUBSCRIBE (0xA2) 这里用高4位判断到 0x80
+        // SUBSCRIBE: pid = vh[0..1]
+        uint16_t pid = ((uint16_t)vh[0] << 8) | vh[1];
+        // 仅处理 SUBSCRIBE：0x82
+        if((data[0] & 0x0F) == 0x02) {
+            hex_feed_suback(m, pid);
+        }
+    } else if(type == 0x30) {
+        // PUBLISH: 解析 pid（仅 qos1 时有）
+        uint8_t qos = (data[0] >> 1) & 0x03;
+        if(qos == 1) {
+            // vh: topic_len(2) + topic + pid(2)
+            uint16_t topic_len = ((uint16_t)vh[0] << 8) | vh[1];
+            const uint8_t* p = vh + 2 + topic_len;
+            uint16_t pid = ((uint16_t)p[0] << 8) | p[1];
+            hex_feed_puback(m, pid);
+        }
+    } else if(type == 0xC0) {
+        // PINGREQ -> PINGRESP（如果你要测试超时，就条件编译不feed）
+        feed_data(m, "D0 00");
+    }
+
+    return (int)len; // demo里认为发送成功
+}
+
+
+// int my_on_send(void* user_ctx, const uint8_t* data, uint16_t len)
+// {
+// 	//不判断user_ctx因为这是作为一个可选字段，以后业务层的时候自定义其他作用
+// 	if(!data || len == 0) {
+// 		return MQTT_ERR_ARG; // 无效的用户上下文
+// 	}
+// 	uint16_t i; 
+//     (void)user_ctx;
+
+//     printf("TX %u bytes: ", (unsigned)len);
+//     for (i = 0; i < len; i++) {
+//         printf("%02X ", data[i]);
+//     }
+//     printf("\r\n");
+// };
 
 void my_on_connack(void* user_ctx, const mqtt_connack_view_t* v)
 {
