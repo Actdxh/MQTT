@@ -59,6 +59,6 @@ if(rc < 0) {
 - `examples/`：示例（app_demo：CONNECT→SUB→PUBLISH→PUBACK→PING）
 
 ## 后续计划（非必须）
-- 重连后自动重订阅（re-subscribe）
+- 重连后自动重订阅（re-subscribe）-----已完成，在demo里面有演示
 - QoS2 流程统一（状态机/超时策略）
 - 增加更多 examples / CI
